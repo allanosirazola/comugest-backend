@@ -1,0 +1,524 @@
+// Comugest - Esquema de base de datos
+// Separación Unidad / Titularidad / Ocupación + verificación de email
+// + módulo de facturas (DERRAMA / INDIVIDUAL) con pagos.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Usuarios y autenticación ────────────────────────────────
+
+enum UserRole {
+  SUPPORT
+  ADMIN_FINCAS
+  VECINO
+}
+
+enum UserStatus {
+  INVITED
+  PENDING
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String?
+  firstName       String
+  lastName        String
+  phone           String?
+  role            UserRole
+  status          UserStatus @default(PENDING)
+  emailVerifiedAt DateTime?
+  locale          String     @default("es")
+  gdprAcceptedAt  DateTime?
+  gdprVersion     String?
+  lastLoginAt     DateTime?
+  invitedById     String?
+  invitedBy       User?      @relation("UserInvitations", fields: [invitedById], references: [id])
+  invitedUsers    User[]     @relation("UserInvitations")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  refreshTokens      RefreshToken[]
+  verificationTokens VerificationToken[]
+  ownedUnits         Ownership[]
+  occupancies        Occupancy[]
+  managedCommunities CommunityAdmin[]
+  issuedInvoices     Invoice[]      @relation("InvoiceIssuer")
+  registeredPayments Payment[]      @relation("PaymentRegistrar")
+  authoredAnnouncements Announcement[] @relation("AnnouncementAuthor")
+  conversations      Conversation[] @relation("ConversationResident")
+  sentMessages       Message[]      @relation("MessageSender")
+  recordedExpenses   Expense[]      @relation("ExpenseRecorder")
+  reportedTickets    Ticket[]       @relation("TicketReporter")
+  assignedTickets    Ticket[]       @relation("TicketAssignee")
+  ticketComments     TicketComment[] @relation("TicketCommentAuthor")
+  requestedProcedures Procedure[]    @relation("ProcedureRequester")
+  handledProcedures   Procedure[]    @relation("ProcedureHandler")
+  procedureUpdates    ProcedureUpdate[] @relation("ProcedureUpdateAuthor")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  INVITATION
+  PASSWORD_RESET
+}
+
+model VerificationToken {
+  id        String                @id @default(cuid())
+  tokenHash String                @unique
+  type      VerificationTokenType
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  metadata  Json?
+  createdAt DateTime              @default(now())
+
+  @@index([userId, type])
+}
+
+// ─── Comunidad de vecinos ────────────────────────────────────
+
+model Community {
+  id                 String   @id @default(cuid())
+  name               String
+  address            String
+  city               String
+  postalCode         String
+  country            String   @default("ES")
+  cif                String?
+  redirectMessagesTo String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  units        Unit[]
+  admins       CommunityAdmin[]
+  customFields CustomFieldDefinition[]
+  invoices     Invoice[]
+  announcements Announcement[]
+  conversations Conversation[]
+  expenses     Expense[]
+  procedures   Procedure[]
+
+  @@index([name])
+}
+
+model CommunityAdmin {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAt  DateTime  @default(now())
+
+  @@unique([communityId, userId])
+  @@index([userId])
+}
+
+enum UnitType {
+  VIVIENDA
+  LOCAL
+  GARAJE
+  TRASTERO
+}
+
+model Unit {
+  id           String    @id @default(cuid())
+  communityId  String
+  community    Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  type         UnitType
+  label        String
+  floor        String?
+  door         String?
+  coefficient  Decimal   @db.Decimal(8, 5) @default(0)
+  surfaceM2    Decimal?  @db.Decimal(8, 2)
+  customFields Json      @default("{}")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  ownerships   Ownership[]
+  occupancies  Occupancy[]
+  invoiceItems InvoiceItem[]
+  procedures   Procedure[]
+
+  @@unique([communityId, label])
+  @@index([communityId])
+}
+
+model Ownership {
+  id        String    @id @default(cuid())
+  unitId    String
+  unit      Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  sharePct  Decimal   @db.Decimal(5, 2) @default(100.00)
+  createdAt DateTime  @default(now())
+
+  @@index([unitId])
+  @@index([ownerId])
+  @@index([endDate])
+}
+
+model Occupancy {
+  id         String    @id @default(cuid())
+  unitId     String
+  unit       Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  occupantId String
+  occupant   User      @relation(fields: [occupantId], references: [id], onDelete: Restrict)
+  isOwner    Boolean   @default(true)
+  startDate  DateTime  @default(now())
+  endDate    DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([unitId])
+  @@index([occupantId])
+}
+
+enum FieldDataType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  JSON
+}
+
+enum GdprCategory {
+  NONE
+  PERSONAL_BASIC
+  PERSONAL_CONTACT
+  FINANCIAL
+  SENSITIVE
+}
+
+model CustomFieldDefinition {
+  id            String        @id @default(cuid())
+  communityId   String
+  community     Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  key           String
+  label         String
+  dataType      FieldDataType
+  gdprCategory  GdprCategory  @default(NONE)
+  legalBasis    String?
+  retentionDays Int?
+  isRequired    Boolean       @default(false)
+  appliesTo     String        @default("UNIT")
+  createdAt     DateTime      @default(now())
+
+  @@unique([communityId, key])
+}
+
+// ─── Facturación: facturas, items y pagos ───────────────────
+
+enum InvoiceType {
+  DERRAMA    // Importe total único, distribuido por coeficiente automáticamente
+  INDIVIDUAL // Cada unidad tiene su propio importe (agua, etc.)
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CARD
+  CASH
+  DIRECT_DEBIT
+  OTHER
+}
+
+model Invoice {
+  id            String      @id @default(cuid())
+  communityId   String
+  community     Community   @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  type          InvoiceType
+  concept       String      // "Agua Q1 2025", "Derrama ascensor"
+  description   String?
+  // Importe total declarado por el admin. Para DERRAMA es el total a repartir;
+  // para INDIVIDUAL es la suma de los items.
+  totalAmount   Decimal     @db.Decimal(12, 2)
+  issueDate     DateTime    @default(now())
+  dueDate       DateTime
+  attachmentUrl String?     // URL al PDF original (subido externamente)
+  // Quién la emitió (admin o support)
+  issuedById    String
+  issuedBy      User        @relation("InvoiceIssuer", fields: [issuedById], references: [id], onDelete: Restrict)
+  cancelledAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items InvoiceItem[]
+
+  @@index([communityId, issueDate])
+  @@index([dueDate])
+}
+
+model InvoiceItem {
+  id              String  @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  unitId          String
+  unit            Unit    @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  amount          Decimal @db.Decimal(12, 2)
+  // Para facturas INDIVIDUAL con consumo (m³, kWh, etc.)
+  consumptionValue Decimal? @db.Decimal(12, 3)
+  consumptionUnit  String?  // "m3", "kWh"
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payments Payment[]
+
+  @@unique([invoiceId, unitId])
+  @@index([unitId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceItemId   String
+  invoiceItem     InvoiceItem   @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  amount          Decimal       @db.Decimal(12, 2)
+  paidAt          DateTime      @default(now())
+  method          PaymentMethod @default(BANK_TRANSFER)
+  reference       String?
+  notes           String?
+  registeredById  String
+  registeredBy    User          @relation("PaymentRegistrar", fields: [registeredById], references: [id], onDelete: Restrict)
+  createdAt       DateTime      @default(now())
+
+  @@index([invoiceItemId])
+  @@index([paidAt])
+}
+
+// ─── Anuncios ────────────────────────────────────────────────
+
+model Announcement {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  title       String
+  body        String
+  pinned      Boolean   @default(false)
+  publishedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([communityId, publishedAt])
+}
+
+// ─── Mensajería (chat admin ↔ vecino) ───────────────────────
+// Una conversación por vecino y comunidad. Cualquier admin de la comunidad
+// puede responder; el vecino habla con "la administración".
+
+model Conversation {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  residentId  String
+  resident    User      @relation("ConversationResident", fields: [residentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  // Se actualiza con cada mensaje, para ordenar por actividad reciente
+  lastMessageAt DateTime @default(now())
+
+  messages Message[]
+
+  @@unique([communityId, residentId])
+  @@index([communityId, lastMessageAt])
+  @@index([residentId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  // true si lo envió un admin (para pintar el lado correcto sin resolver roles)
+  fromAdmin      Boolean
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ─── Gastos de comunidad ────────────────────────────────────
+
+enum ExpenseCategory {
+  CLEANING     // Limpieza
+  LIFT         // Ascensor
+  GARBAGE      // Basuras
+  GARDENING    // Jardinería
+  MAINTENANCE  // Mantenimiento general
+  INSURANCE    // Seguro
+  ELECTRICITY  // Luz zonas comunes
+  WATER        // Agua comunitaria
+  SECURITY     // Seguridad / portería
+  ADMIN_FEES   // Honorarios administración
+  SUPPLIES     // Suministros / material
+  OTHER        // Otros
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  communityId   String
+  community     Community       @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  category      ExpenseCategory
+  concept       String
+  description   String?
+  amount        Decimal         @db.Decimal(12, 2)
+  expenseDate   DateTime
+  supplier      String?         // proveedor
+  attachmentUrl String?         // factura del proveedor
+  recordedById  String
+  recordedBy    User            @relation("ExpenseRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([communityId, expenseDate])
+  @@index([communityId, category])
+}
+
+// ─── Tickets de soporte (sistema interno) ───────────────────
+
+enum TicketCategory {
+  BUG             // Error/fallo
+  FEATURE_REQUEST // Sugerencia de mejora
+  QUESTION        // Duda
+  BILLING         // Facturación/cuenta
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id           String         @id @default(cuid())
+  reporterId   String
+  reporter     User           @relation("TicketReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  category     TicketCategory
+  status       TicketStatus   @default(OPEN)
+  priority     TicketPriority @default(MEDIUM)
+  subject      String
+  description  String
+  // Contexto técnico para depurar (lo aporta el cliente al reportar)
+  pageUrl      String?
+  userAgent    String?
+  assignedToId String?
+  assignedTo   User?          @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  comments TicketComment[]
+
+  @@index([status, priority])
+  @@index([reporterId])
+  @@index([createdAt])
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("TicketCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  body      String
+  // Nota interna: solo visible para SUPPORT, no para el reporter
+  internal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+// ─── Trámites con la administración ─────────────────────────
+// El vecino presenta una gestión; el administrador la refleja y resuelve.
+
+enum ProcedureType {
+  CERTIFICATE      // Certificado (estar al corriente de pago, etc.)
+  MAINTENANCE      // Incidencia/avería en zonas comunes
+  DOCUMENT_REQUEST // Solicitud de documento (actas, estatutos)
+  COMPLAINT        // Queja / reclamación
+  PERMISSION       // Solicitud de permiso (obras, mudanza…)
+  OTHER
+}
+
+enum ProcedureStatus {
+  SUBMITTED   // Presentado por el vecino
+  IN_REVIEW   // En revisión
+  IN_PROGRESS // En trámite
+  COMPLETED   // Resuelto
+  REJECTED    // Rechazado
+}
+
+model Procedure {
+  id            String          @id @default(cuid())
+  communityId   String
+  community     Community       @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  requesterId   String
+  requester     User            @relation("ProcedureRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  type          ProcedureType
+  status        ProcedureStatus @default(SUBMITTED)
+  subject       String
+  description   String
+  unitId        String?
+  unit          Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  resolution    String?         // respuesta/resolución del admin
+  attachmentUrl String?         // documento resultante (certificado, etc.)
+  handledById   String?
+  handledBy     User?           @relation("ProcedureHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  updates ProcedureUpdate[]
+
+  @@index([communityId, status])
+  @@index([requesterId])
+}
+
+model ProcedureUpdate {
+  id          String    @id @default(cuid())
+  procedureId String
+  procedure   Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation("ProcedureUpdateAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  body        String
+  createdAt   DateTime  @default(now())
+
+  @@index([procedureId, createdAt])
+}
