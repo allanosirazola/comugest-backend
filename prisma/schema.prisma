@@ -63,6 +63,7 @@ model User {
   requestedProcedures Procedure[]    @relation("ProcedureRequester")
   handledProcedures   Procedure[]    @relation("ProcedureHandler")
   procedureUpdates    ProcedureUpdate[] @relation("ProcedureUpdateAuthor")
+  auditLogs           AuditLog[]        @relation("AuditActor")
 
   @@index([email])
   @@index([role])
@@ -545,4 +546,43 @@ model ProcedureUpdate {
   createdAt   DateTime  @default(now())
 
   @@index([procedureId, createdAt])
+}
+
+// ─── Audit Log ───────────────────────────────────────────────
+
+enum AuditAction {
+  INVOICE_CREATED
+  INVOICE_CANCELLED
+  PAYMENT_RECORDED
+  PAYMENT_DELETED
+  RESIDENT_INVITED
+  RESIDENT_ACTIVATED
+  COMMUNITY_CREATED
+  COMMUNITY_DELETED
+  ANNOUNCEMENT_PUBLISHED
+  EXPENSE_CREATED
+  EXPENSE_DELETED
+  PROCEDURE_SUBMITTED
+  PROCEDURE_STATUS_CHANGED
+  TICKET_CREATED
+  TICKET_STATUS_CHANGED
+  BUDGET_UPSERTED
+  USER_LOGIN
+  USER_ROLE_CHANGED
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  actorId     String?
+  actor       User?       @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  targetType  String?     // "Invoice", "Community", etc.
+  targetId    String?     // ID of the affected record
+  communityId String?     // for scoping queries per-community
+  meta        Json?       // extra context (amounts, names, etc.)
+  createdAt   DateTime    @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([communityId, createdAt])
+  @@index([action, createdAt])
 }
