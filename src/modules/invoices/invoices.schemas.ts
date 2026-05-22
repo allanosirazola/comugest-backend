@@ -56,3 +56,12 @@ export const listInvoicesQuerySchema = z.object({
   type: z.enum(['DERRAMA', 'INDIVIDUAL']).optional(),
 });
 export type ListInvoicesQuery = z.infer<typeof listInvoicesQuerySchema>;
+
+// ─── SEPA export ────────────────────────────────────────────
+
+export const sepaExportSchema = z.object({
+  creditorName: z.string().min(1).max(140),
+  creditorIban: z.string().min(15).max(34).regex(/^[A-Z]{2}[0-9A-Z]+$/, 'IBAN inválido'),
+  creditorBic: z.string().min(8).max(11).regex(/^[A-Z0-9]+$/, 'BIC inválido'),
+});
+export type SepaExportInput = z.infer<typeof sepaExportSchema>;
