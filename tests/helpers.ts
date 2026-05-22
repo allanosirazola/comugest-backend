@@ -122,6 +122,8 @@ export async function cleanup(): Promise<void> {
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.announcement.deleteMany();
+  await prisma.budgetLine.deleteMany();
+  await prisma.budget.deleteMany();
   await prisma.expense.deleteMany();
   await prisma.procedureUpdate.deleteMany();
   await prisma.procedure.deleteMany();

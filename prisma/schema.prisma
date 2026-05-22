@@ -123,6 +123,7 @@ model Community {
   conversations Conversation[]
   expenses     Expense[]
   procedures   Procedure[]
+  budgets      Budget[]
 
   @@index([name])
 }
@@ -285,6 +286,7 @@ model InvoiceItem {
   consumptionValue Decimal? @db.Decimal(12, 3)
   consumptionUnit  String?  // "m3", "kWh"
   notes            String?
+  reminderSentAt   DateTime? // Último recordatorio de pago enviado
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -400,6 +402,28 @@ model Expense {
 
   @@index([communityId, expenseDate])
   @@index([communityId, category])
+}
+
+// ─── Presupuestos anuales ────────────────────────────────────
+
+model Budget {
+  id          String      @id @default(cuid())
+  communityId String
+  year        Int
+  community   Community   @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  lines       BudgetLine[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([communityId, year])
+}
+
+model BudgetLine {
+  id       String  @id @default(cuid())
+  budgetId String
+  budget   Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category String  // matches ExpenseCategory enum values
+  amount   Decimal @db.Decimal(12, 2)
 }
 
 // ─── Tickets de soporte (sistema interno) ───────────────────
