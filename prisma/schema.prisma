@@ -64,6 +64,10 @@ model User {
   handledProcedures   Procedure[]    @relation("ProcedureHandler")
   procedureUpdates    ProcedureUpdate[] @relation("ProcedureUpdateAuthor")
   auditLogs           AuditLog[]        @relation("AuditActor")
+  reservations        Reservation[]     @relation("ReservationUser")
+  cancelledReservations Reservation[]   @relation("ReservationCanceller")
+  organizedMeetings   Meeting[]         @relation("MeetingOrganizer")
+  meetingAttendances  MeetingAttendee[]
 
   @@index([email])
   @@index([role])
@@ -125,6 +129,8 @@ model Community {
   expenses     Expense[]
   procedures   Procedure[]
   budgets      Budget[]
+  commonAreas  CommonArea[]
+  meetings     Meeting[]
 
   @@index([name])
 }
@@ -548,6 +554,110 @@ model ProcedureUpdate {
   @@index([procedureId, createdAt])
 }
 
+// ─── Zonas comunes y reservas ────────────────────────────────
+
+model CommonArea {
+  id            String    @id @default(cuid())
+  communityId   String
+  community     Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  capacity      Int?
+  openTime      String    @default("08:00")
+  closeTime     String    @default("22:00")
+  slotMinutes   Int       @default(60)
+  maxSlotsPerDay Int      @default(2)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  reservations Reservation[]
+
+  @@index([communityId])
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model Reservation {
+  id              String            @id @default(cuid())
+  areaId          String
+  area            CommonArea        @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User              @relation("ReservationUser", fields: [userId], references: [id], onDelete: Cascade)
+  startAt         DateTime
+  endAt           DateTime
+  status          ReservationStatus @default(CONFIRMED)
+  notes           String?
+  cancelledAt     DateTime?
+  cancelledById   String?
+  cancelledBy     User?             @relation("ReservationCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+
+  @@index([areaId, startAt])
+  @@index([userId])
+}
+
+// ─── Reuniones de junta ──────────────────────────────────────
+
+enum MeetingType {
+  ORDINARY
+  EXTRAORDINARY
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  HELD
+  CANCELLED
+}
+
+model Meeting {
+  id              String        @id @default(cuid())
+  communityId     String
+  community       Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  title           String
+  type            MeetingType   @default(ORDINARY)
+  status          MeetingStatus @default(SCHEDULED)
+  scheduledAt     DateTime
+  location        String?
+  agenda          String?
+  minutes         String?
+  minutesUrl      String?
+  organizedById   String
+  organizedBy     User          @relation("MeetingOrganizer", fields: [organizedById], references: [id], onDelete: Restrict)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  attendees MeetingAttendee[]
+
+  @@index([communityId, scheduledAt])
+}
+
+enum AttendanceStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  DELEGATED
+}
+
+model MeetingAttendee {
+  id        String           @id @default(cuid())
+  meetingId String
+  meeting   Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    AttendanceStatus @default(PENDING)
+  proxy     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([meetingId, userId])
+  @@index([meetingId])
+  @@index([userId])
+}
+
 // ─── Audit Log ───────────────────────────────────────────────
 
 enum AuditAction {
@@ -569,6 +679,11 @@ enum AuditAction {
   BUDGET_UPSERTED
   USER_LOGIN
   USER_ROLE_CHANGED
+  RESERVATION_CREATED
+  RESERVATION_CANCELLED
+  MEETING_CREATED
+  MEETING_UPDATED
+  MEETING_CANCELLED
 }
 
 model AuditLog {

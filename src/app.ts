@@ -17,6 +17,8 @@ import proceduresRoutes, { meProceduresRouter, communityProceduresRouter } from 
 import { communityBudgetsRouter } from './modules/budgets/budgets.router';
 import { adminRouter } from './modules/admin/admin.router';
 import { auditRouter } from './modules/audit/audit.router';
+import { communityAreasRouter, areaActionsRouter } from './modules/common-areas/common-areas.router';
+import { communityMeetingsRouter, meetingsRouter } from './modules/meetings/meetings.router';
 
 import './types/express';
 
@@ -66,6 +68,10 @@ export function createApp(): Express {
   app.use('/api/v1/support', supportRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/admin/audit', auditRouter);
+  app.use('/api/v1/communities/:communityId/areas', communityAreasRouter);
+  app.use('/api/v1/areas', areaActionsRouter);
+  app.use('/api/v1/communities/:communityId/meetings', communityMeetingsRouter);
+  app.use('/api/v1/meetings', meetingsRouter);
   // Vistas del propio vecino bajo /api/v1/me
   app.use('/api/v1/me', meInvoicesRouter);
   app.use('/api/v1/me', meAnnouncementsRouter);
