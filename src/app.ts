@@ -20,8 +20,6 @@ import { auditRouter } from './modules/audit/audit.router';
 import { communityAreasRouter, areaActionsRouter } from './modules/common-areas/common-areas.router';
 import { communityMeetingsRouter, meetingsRouter } from './modules/meetings/meetings.router';
 
-import './types/express';
-
 export function createApp(): Express {
   const app = express();
 
