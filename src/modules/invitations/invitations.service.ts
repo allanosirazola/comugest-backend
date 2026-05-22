@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { audit } from '../audit/audit.service';
 import { env } from '../../config/env';
 import { generateVerificationToken, hashToken } from '../../utils/tokens';
 import { hashPassword } from '../../utils/password';
@@ -116,6 +117,15 @@ export async function createInvitation(
       acceptUrl: buildFrontendUrl(`/accept-invitation?token=${encodeURIComponent(token)}`),
       expiresInDays: env.INVITATION_EXPIRES_DAYS,
     },
+  });
+
+  void audit({
+    action: 'RESIDENT_INVITED',
+    actorId: inviterId,
+    targetType: 'User',
+    targetId: user.id,
+    communityId: input.communityId,
+    meta: { email: user.email, unitId: input.unitId },
   });
 
   return { invitationId: invitation.id, userId: user.id, sentTo: user.email };

@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { audit } from '../audit/audit.service';
 import { Prisma, type UserRole, type Invoice, type InvoiceItem, type Payment } from '@prisma/client';
 import {
   ConflictError,
@@ -159,6 +160,15 @@ export async function createInvoice(
   // Enviar emails a los propietarios activos de cada unidad
   await notifyInvoiceIssued(invoice).catch(() => {
     // No bloqueamos la creación si el envío falla. Lo loguea el servicio de email.
+  });
+
+  void audit({
+    action: 'INVOICE_CREATED',
+    actorId: userId,
+    targetType: 'Invoice',
+    targetId: invoice.id,
+    communityId,
+    meta: { concept: invoice.concept, total: computedTotal, type: invoice.type },
   });
 
   return { ...invoice, status: computeInvoiceStatus(invoice) };
@@ -326,7 +336,7 @@ export async function recordPayment(
     );
   }
 
-  return prisma.payment.create({
+  const payment = await prisma.payment.create({
     data: {
       invoiceItemId: itemId,
       amount: new Prisma.Decimal(input.amount),
@@ -337,6 +347,17 @@ export async function recordPayment(
       registeredById: userId,
     },
   });
+
+  void audit({
+    action: 'PAYMENT_RECORDED',
+    actorId: userId,
+    targetType: 'Payment',
+    targetId: payment.id,
+    communityId: item.invoice.communityId,
+    meta: { amount: input.amount, invoiceId: item.invoiceId },
+  });
+
+  return payment;
 }
 
 export async function deletePayment(userId: string, userRole: UserRole, paymentId: string) {
@@ -366,10 +387,21 @@ export async function cancelInvoice(userId: string, userRole: UserRole, invoiceI
   if (invoice.cancelledAt) {
     throw new ConflictError('La factura ya está cancelada');
   }
-  return prisma.invoice.update({
+  const cancelled = await prisma.invoice.update({
     where: { id: invoiceId },
     data: { cancelledAt: new Date() },
   });
+
+  void audit({
+    action: 'INVOICE_CANCELLED',
+    actorId: userId,
+    targetType: 'Invoice',
+    targetId: invoiceId,
+    communityId: invoice.communityId,
+    meta: { concept: invoice.concept },
+  });
+
+  return cancelled;
 }
 
 // ─── Morosos ────────────────────────────────────────────────

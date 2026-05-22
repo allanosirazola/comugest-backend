@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './config/logger';
 import { prisma } from './config/prisma';
+import { startJobs } from './jobs';
 
 async function main(): Promise<void> {
   // Verificar conexión a BD antes de arrancar
@@ -17,6 +18,7 @@ async function main(): Promise<void> {
 
   const server = app.listen(env.PORT, () => {
     logger.info(`🚀 Comugest API arrancado en http://localhost:${env.PORT} [${env.NODE_ENV}]`);
+    startJobs();
   });
 
   // Graceful shutdown

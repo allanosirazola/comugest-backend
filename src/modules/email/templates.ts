@@ -35,6 +35,15 @@ export interface TemplateVars {
     title: string;
     viewUrl: string;
   };
+  paymentReminder: {
+    firstName: string;
+    communityName: string;
+    unitLabel: string;
+    concept: string;
+    amount: string;
+    dueDate: string;
+    viewUrl: string;
+  };
 }
 
 export type TemplateName = keyof TemplateVars;
@@ -291,6 +300,38 @@ Read it in the app: ${v.viewUrl}
          <p style="margin:0 0 24px;font-size:18px;font-weight:600;color:#3b442e;">${escapeHtml(v.title)}</p>
          <p style="margin:24px 0;"><a href="${v.viewUrl}" style="display:inline-block;background:#485436;color:#faf7ec;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">Read announcement</a></p>`,
         'You receive this because your manager notifies community announcements.'
+      ),
+    }),
+  },
+  paymentReminder: {
+    es: (v: TemplateVars['paymentReminder']): RenderedEmail => ({
+      subject: `Recordatorio de pago: ${v.concept}`,
+      text: `Hola ${v.firstName},\n\nTienes una factura pendiente de pago:\n\n- Concepto: ${v.concept}\n- Comunidad: ${v.communityName} (${v.unitLabel})\n- Importe: ${v.amount} €\n- Vencimiento: ${v.dueDate}\n\nPuedes ver el detalle en: ${v.viewUrl}\n\nSi ya has realizado el pago, ignora este mensaje.`,
+      html: wrapHtml(
+        `<p style="margin:0 0 16px;">Hola <strong>${escapeHtml(v.firstName)}</strong>,</p>
+         <p style="margin:0 0 16px;">Tienes una factura pendiente de pago para tu unidad <strong>${escapeHtml(v.unitLabel)}</strong> en <em>${escapeHtml(v.communityName)}</em>.</p>
+         <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+           <tr><td style="padding:8px;color:#6b7280;">Concepto</td><td style="padding:8px;font-weight:600;">${escapeHtml(v.concept)}</td></tr>
+           <tr style="background:#f9fafb;"><td style="padding:8px;color:#6b7280;">Importe</td><td style="padding:8px;font-weight:600;">${escapeHtml(v.amount)} €</td></tr>
+           <tr><td style="padding:8px;color:#6b7280;">Vencimiento</td><td style="padding:8px;">${escapeHtml(v.dueDate)}</td></tr>
+         </table>
+         <p style="margin:24px 0;"><a href="${v.viewUrl}" style="display:inline-block;background:#485436;color:#faf7ec;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">Ver factura</a></p>`,
+        'Si ya has realizado el pago, ignora este mensaje.'
+      ),
+    }),
+    en: (v: TemplateVars['paymentReminder']): RenderedEmail => ({
+      subject: `Payment reminder: ${v.concept}`,
+      text: `Hi ${v.firstName},\n\nYou have a pending invoice:\n\n- Concept: ${v.concept}\n- Community: ${v.communityName} (${v.unitLabel})\n- Amount: ${v.amount} €\n- Due: ${v.dueDate}\n\nView details at: ${v.viewUrl}\n\nIf you have already paid, please disregard this message.`,
+      html: wrapHtml(
+        `<p style="margin:0 0 16px;">Hi <strong>${escapeHtml(v.firstName)}</strong>,</p>
+         <p style="margin:0 0 16px;">You have a pending invoice for your unit <strong>${escapeHtml(v.unitLabel)}</strong> at <em>${escapeHtml(v.communityName)}</em>.</p>
+         <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+           <tr><td style="padding:8px;color:#6b7280;">Concept</td><td style="padding:8px;font-weight:600;">${escapeHtml(v.concept)}</td></tr>
+           <tr style="background:#f9fafb;"><td style="padding:8px;color:#6b7280;">Amount</td><td style="padding:8px;font-weight:600;">${escapeHtml(v.amount)} €</td></tr>
+           <tr><td style="padding:8px;color:#6b7280;">Due date</td><td style="padding:8px;">${escapeHtml(v.dueDate)}</td></tr>
+         </table>
+         <p style="margin:24px 0;"><a href="${v.viewUrl}" style="display:inline-block;background:#485436;color:#faf7ec;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">View invoice</a></p>`,
+        'If you have already paid, please disregard this message.'
       ),
     }),
   },

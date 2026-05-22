@@ -14,6 +14,11 @@ import messagesRoutes from './modules/messages/messages.routes';
 import expensesRoutes, { communityExpensesRouter, meExpensesRouter } from './modules/expenses/expenses.routes';
 import ticketsRoutes, { meTicketsRouter, supportRouter } from './modules/tickets/tickets.routes';
 import proceduresRoutes, { meProceduresRouter, communityProceduresRouter } from './modules/procedures/procedures.routes';
+import { communityBudgetsRouter } from './modules/budgets/budgets.router';
+import { adminRouter } from './modules/admin/admin.router';
+import { auditRouter } from './modules/audit/audit.router';
+import { communityAreasRouter, areaActionsRouter } from './modules/common-areas/common-areas.router';
+import { communityMeetingsRouter, meetingsRouter } from './modules/meetings/meetings.router';
 
 import './types/express';
 
@@ -54,12 +59,19 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/announcements', communityAnnouncementsRouter);
   app.use('/api/v1/communities/:communityId/expenses', communityExpensesRouter);
   app.use('/api/v1/communities/:communityId/procedures', communityProceduresRouter);
+  app.use('/api/v1/communities/:communityId/budgets', communityBudgetsRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
   app.use('/api/v1/messages', messagesRoutes);
   app.use('/api/v1/tickets', ticketsRoutes);
   app.use('/api/v1/procedures', proceduresRoutes);
   app.use('/api/v1/support', supportRouter);
+  app.use('/api/v1/admin', adminRouter);
+  app.use('/api/v1/admin/audit', auditRouter);
+  app.use('/api/v1/communities/:communityId/areas', communityAreasRouter);
+  app.use('/api/v1/areas', areaActionsRouter);
+  app.use('/api/v1/communities/:communityId/meetings', communityMeetingsRouter);
+  app.use('/api/v1/meetings', meetingsRouter);
   // Vistas del propio vecino bajo /api/v1/me
   app.use('/api/v1/me', meInvoicesRouter);
   app.use('/api/v1/me', meAnnouncementsRouter);

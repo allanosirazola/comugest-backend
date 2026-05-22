@@ -1,10 +1,13 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import * as service from './invoices.service';
+import { generateSepaXml } from './sepa.service';
+import { generateInvoicePdf } from './pdf.service';
 import {
   createInvoiceSchema,
   createPaymentSchema,
   listInvoicesQuerySchema,
+  sepaExportSchema,
 } from './invoices.schemas';
 import { UnauthorizedError } from '../../utils/errors';
 
@@ -77,4 +80,37 @@ export async function myInvoiceItems(req: Request, res: Response): Promise<void>
   const user = requireUser(req);
   const items = await service.listMyInvoiceItems(user.id);
   res.json({ items });
+}
+
+// ─── SEPA Export ────────────────────────────────────────────
+
+export async function exportSepa(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { communityId, invoiceId } = z
+    .object({ communityId: z.string().cuid(), invoiceId: z.string().cuid() })
+    .parse(req.params);
+  const body = sepaExportSchema.parse(req.body);
+  const xml = await generateSepaXml(user.id, user.role, {
+    communityId,
+    invoiceId,
+    creditorName: body.creditorName,
+    creditorIban: body.creditorIban,
+    creditorBic: body.creditorBic,
+  });
+  res.setHeader('Content-Type', 'application/xml');
+  res.setHeader('Content-Disposition', `attachment; filename="sepa-${invoiceId}.xml"`);
+  res.send(xml);
+}
+
+// ─── PDF Export ─────────────────────────────────────────────
+
+export async function exportPdf(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { communityId, invoiceId } = z
+    .object({ communityId: z.string().cuid(), invoiceId: z.string().cuid() })
+    .parse(req.params);
+  const buffer = await generateInvoicePdf(user.id, user.role, communityId, invoiceId);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoiceId}.pdf"`);
+  res.send(buffer);
 }

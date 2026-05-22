@@ -1,4 +1,5 @@
 node_modules/
+package-lock.json
 dist/
 coverage/
 .env
@@ -9,3 +10,4 @@ coverage/
 .idea/
 .vscode/
 prisma/migrations/dev.db*
+.claude/
