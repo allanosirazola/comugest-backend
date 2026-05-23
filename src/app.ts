@@ -20,6 +20,7 @@ import { auditRouter } from './modules/audit/audit.router';
 import { communityAreasRouter, areaActionsRouter, meReservationsRouter } from './modules/common-areas/common-areas.router';
 import { communityMeetingsRouter, meetingsRouter, meMeetingsRouter } from './modules/meetings/meetings.router';
 import { meProfileRouter } from './modules/me/me.router';
+import { communityRecurringRouter } from './modules/recurring-invoices/recurring-invoices.router';
 
 export function createApp(): Express {
   const app = express();
@@ -59,6 +60,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/expenses', communityExpensesRouter);
   app.use('/api/v1/communities/:communityId/procedures', communityProceduresRouter);
   app.use('/api/v1/communities/:communityId/budgets', communityBudgetsRouter);
+  app.use('/api/v1/communities/:communityId/recurring', communityRecurringRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
   app.use('/api/v1/messages', messagesRoutes);

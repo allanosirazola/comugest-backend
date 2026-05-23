@@ -68,6 +68,7 @@ model User {
   cancelledReservations Reservation[]   @relation("ReservationCanceller")
   organizedMeetings   Meeting[]         @relation("MeetingOrganizer")
   meetingAttendances  MeetingAttendee[]
+  createdRecurringInvoices RecurringInvoice[] @relation("RecurringInvoiceCreator")
 
   @@index([email])
   @@index([role])
@@ -131,6 +132,7 @@ model Community {
   budgets      Budget[]
   commonAreas  CommonArea[]
   meetings     Meeting[]
+  recurringInvoices RecurringInvoice[]
 
   @@index([name])
 }
@@ -273,6 +275,8 @@ model Invoice {
   issuedById    String
   issuedBy      User        @relation("InvoiceIssuer", fields: [issuedById], references: [id], onDelete: Restrict)
   cancelledAt   DateTime?
+  recurringSourceId String?
+  recurringSource   RecurringInvoice? @relation("RecurringSource", fields: [recurringSourceId], references: [id], onDelete: SetNull)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -431,6 +435,36 @@ model BudgetLine {
   budget   Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   category String  // matches ExpenseCategory enum values
   amount   Decimal @db.Decimal(12, 2)
+}
+
+// ─── Cuotas ordinarias recurrentes ──────────────────────────
+
+enum RecurringFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model RecurringInvoice {
+  id            String              @id @default(cuid())
+  communityId   String
+  community     Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  concept       String
+  description   String?
+  frequency     RecurringFrequency
+  amount        Decimal             @db.Decimal(12, 2)
+  dayOfMonth    Int                 @default(1)   // day of month to issue (1-28)
+  nextBillingAt DateTime
+  active        Boolean             @default(true)
+  createdById   String
+  createdBy     User                @relation("RecurringInvoiceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  generatedInvoices Invoice[]       @relation("RecurringSource")
+
+  @@index([communityId])
+  @@index([nextBillingAt, active])
 }
 
 // ─── Tickets de soporte (sistema interno) ───────────────────
@@ -684,6 +718,8 @@ enum AuditAction {
   MEETING_CREATED
   MEETING_UPDATED
   MEETING_CANCELLED
+  RECURRING_INVOICE_CREATED
+  RECURRING_INVOICE_TRIGGERED
 }
 
 model AuditLog {
