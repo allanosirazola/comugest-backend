@@ -126,6 +126,21 @@ export async function updateMeeting(
   return meeting;
 }
 
+export async function listMyMeetings(userId: string) {
+  return prisma.meeting.findMany({
+    where: {
+      attendees: { some: { userId } },
+    },
+    orderBy: { scheduledAt: 'desc' },
+    include: {
+      attendees: {
+        where: { userId },
+        select: { status: true },
+      },
+    },
+  });
+}
+
 export async function updateAttendance(
   userId: string,
   meetingId: string,

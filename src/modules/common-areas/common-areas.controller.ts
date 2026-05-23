@@ -63,6 +63,12 @@ export async function createReservation(req: Request, res: Response): Promise<vo
   res.status(201).json({ reservation });
 }
 
+export async function listMyReservations(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const reservations = await service.listMyReservations(user.id);
+  res.json({ reservations });
+}
+
 export async function cancelReservation(req: Request, res: Response): Promise<void> {
   const user = requireUser(req);
   const { id } = z.object({ id: z.string() }).parse(req.params);

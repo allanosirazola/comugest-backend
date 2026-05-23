@@ -16,4 +16,9 @@ meetingsRouter.get('/:id', asyncHandler(controller.get));
 meetingsRouter.patch('/:id', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.update));
 meetingsRouter.patch('/:id/attendance', asyncHandler(controller.updateMyAttendance));
 
+// Vecino: /me/meetings
+export const meMeetingsRouter: Router = Router();
+meMeetingsRouter.use(authenticate);
+meMeetingsRouter.get('/meetings', asyncHandler(controller.listMyMeetings));
+
 export default meetingsRouter;

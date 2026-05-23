@@ -39,6 +39,12 @@ export async function update(req: Request, res: Response): Promise<void> {
   res.json({ meeting });
 }
 
+export async function listMyMeetings(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const meetings = await service.listMyMeetings(user.id);
+  res.json({ meetings });
+}
+
 export async function updateMyAttendance(req: Request, res: Response): Promise<void> {
   const user = requireUser(req);
   const { id } = z.object({ id: z.string().cuid() }).parse(req.params);
