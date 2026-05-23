@@ -21,6 +21,8 @@ import { communityAreasRouter, areaActionsRouter, meReservationsRouter } from '.
 import { communityMeetingsRouter, meetingsRouter, meMeetingsRouter } from './modules/meetings/meetings.router';
 import { meProfileRouter } from './modules/me/me.router';
 import { communityRecurringRouter } from './modules/recurring-invoices/recurring-invoices.router';
+import { communityDocumentsRouter } from './modules/documents/documents.router';
+import { meDocumentsRouter } from './modules/me/me.router';
 
 export function createApp(): Express {
   const app = express();
@@ -61,6 +63,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/procedures', communityProceduresRouter);
   app.use('/api/v1/communities/:communityId/budgets', communityBudgetsRouter);
   app.use('/api/v1/communities/:communityId/recurring', communityRecurringRouter);
+  app.use('/api/v1/communities/:communityId/documents', communityDocumentsRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
   app.use('/api/v1/messages', messagesRoutes);
@@ -83,6 +86,7 @@ export function createApp(): Express {
   app.use('/api/v1/me', meProfileRouter);
   app.use('/api/v1/me', meReservationsRouter);
   app.use('/api/v1/me', meMeetingsRouter);
+  app.use('/api/v1/me', meDocumentsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

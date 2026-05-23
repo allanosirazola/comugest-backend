@@ -69,6 +69,7 @@ model User {
   organizedMeetings   Meeting[]         @relation("MeetingOrganizer")
   meetingAttendances  MeetingAttendee[]
   createdRecurringInvoices RecurringInvoice[] @relation("RecurringInvoiceCreator")
+  uploadedDocuments        Document[]         @relation("DocumentUploader")
 
   @@index([email])
   @@index([role])
@@ -133,6 +134,7 @@ model Community {
   commonAreas  CommonArea[]
   meetings     Meeting[]
   recurringInvoices RecurringInvoice[]
+  documents         Document[]
 
   @@index([name])
 }
@@ -720,6 +722,8 @@ enum AuditAction {
   MEETING_CANCELLED
   RECURRING_INVOICE_CREATED
   RECURRING_INVOICE_TRIGGERED
+  DOCUMENT_CREATED
+  DOCUMENT_DELETED
 }
 
 model AuditLog {
@@ -736,4 +740,33 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([communityId, createdAt])
   @@index([action, createdAt])
+}
+
+// ─── Archivo de documentos ───────────────────────────────────
+
+enum DocumentCategory {
+  ACTA
+  REGLAMENTO
+  PRESUPUESTO
+  CONTRATO
+  CERTIFICADO
+  OTRO
+}
+
+model Document {
+  id                 String           @id @default(cuid())
+  communityId        String
+  community          Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  category           DocumentCategory @default(OTRO)
+  url                String
+  publicForResidents Boolean          @default(true)
+  uploadedById       String
+  uploadedBy         User             @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([communityId])
+  @@index([communityId, category])
 }
