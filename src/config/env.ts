@@ -25,6 +25,10 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default('Comugest <no-reply@comugest.app>'),
   EMAIL_VERIFICATION_EXPIRES_HOURS: z.coerce.number().int().positive().default(24),
   INVITATION_EXPIRES_DAYS: z.coerce.number().int().positive().default(7),
+
+  STRIPE_SECRET_KEY: z.string().optional().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  STRIPE_PRICE_ID: z.string().optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);

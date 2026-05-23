@@ -29,6 +29,7 @@ import { meetingPollsRouter } from './modules/polls/polls.router';
 import { communityMeterReadingsRouter } from './modules/meter-readings/meter-readings.router';
 import { communityCalendarRouter, meCalendarRouter } from './modules/calendar/calendar.router';
 import { communitySupplierRouter } from './modules/suppliers/suppliers.router';
+import { billingRouter } from './modules/billing/billing.router';
 
 export function createApp(): Express {
   const app = express();
@@ -49,6 +50,9 @@ export function createApp(): Express {
       legacyHeaders: false,
     })
   );
+
+  // Raw body for Stripe webhook — must be before express.json()
+  app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
 
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -100,6 +104,7 @@ export function createApp(): Express {
   app.use('/api/v1/me', meDocumentsRouter);
   app.use('/api/v1/communities/:communityId/calendar', communityCalendarRouter);
   app.use('/api/v1/me', meCalendarRouter);
+  app.use('/api/v1/billing', billingRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

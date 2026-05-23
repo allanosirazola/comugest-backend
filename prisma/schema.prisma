@@ -43,6 +43,10 @@ model User {
   invitedById     String?
   invitedBy       User?      @relation("UserInvitations", fields: [invitedById], references: [id])
   invitedUsers    User[]     @relation("UserInvitations")
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  planStatus           String   @default("FREE")
+  planCurrentPeriodEnd DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -746,6 +750,8 @@ enum AuditAction {
   METER_READING_ADDED
   MINUTES_SAVED
   MINUTES_PUBLISHED
+  SUBSCRIPTION_ACTIVATED
+  SUBSCRIPTION_CANCELLED
 }
 
 model AuditLog {
