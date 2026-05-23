@@ -30,6 +30,7 @@ import { communityMeterReadingsRouter } from './modules/meter-readings/meter-rea
 import { communityCalendarRouter, meCalendarRouter } from './modules/calendar/calendar.router';
 import { communitySupplierRouter } from './modules/suppliers/suppliers.router';
 import { billingRouter } from './modules/billing/billing.router';
+import { pushRouter } from './modules/push/push.router';
 
 export function createApp(): Express {
   const app = express();
@@ -105,6 +106,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/calendar', communityCalendarRouter);
   app.use('/api/v1/me', meCalendarRouter);
   app.use('/api/v1/billing', billingRouter);
+  app.use('/api/v1/push', pushRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

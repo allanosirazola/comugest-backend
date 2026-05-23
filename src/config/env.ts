@@ -29,6 +29,10 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
   STRIPE_PRICE_ID: z.string().optional().default(''),
+
+  VAPID_PUBLIC_KEY: z.string().optional().default(''),
+  VAPID_PRIVATE_KEY: z.string().optional().default(''),
+  VAPID_EMAIL: z.string().optional().default('mailto:admin@comugest.app'),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -78,6 +78,7 @@ model User {
   votes                    Vote[]             @relation("VoteCaster")
   recordedReadings         MeterReading[]     @relation("MeterReadingRecorder")
   createdSuppliers         Supplier[]         @relation("SupplierCreator")
+  pushSubscriptions        PushSubscription[]
 
   @@index([email])
   @@index([role])
@@ -889,4 +890,18 @@ model Supplier {
   expenses    Expense[] @relation("ExpenseSupplier")
 
   @@index([communityId])
+}
+
+// ─── Web Push Subscriptions ──────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
