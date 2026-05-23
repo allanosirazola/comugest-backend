@@ -6,6 +6,7 @@ import { sendEmail } from '../email/email.service';
 import { buildFrontendUrl } from '../email/templates';
 import type { CreateAnnouncementInput, UpdateAnnouncementInput } from './announcements.schemas';
 import { sendToCommunity } from '../push/push.service';
+import { createNotificationsForCommunity } from '../notifications/notifications.service';
 
 export async function listCommunityAnnouncements(userId: string, userRole: UserRole, communityId: string) {
   await assertCommunityAccess(userId, userRole, communityId);
@@ -47,6 +48,9 @@ export async function createAnnouncement(
     body: announcement.body.slice(0, 100),
     url: `/announcements`,
   });
+
+  // Fire-and-forget in-app notifications
+  void createNotificationsForCommunity(communityId, { title: announcement.title, body: announcement.body.slice(0, 120), url: '/announcements' });
 
   return announcement;
 }

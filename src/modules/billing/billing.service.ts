@@ -86,6 +86,51 @@ function getPeriodEnd(sub: StripeSubscription): Date | null {
   return null;
 }
 
+export async function createInvoiceCheckoutSession(userId: string, communityId: string, invoiceId: string, successUrl: string, cancelUrl: string): Promise<string> {
+  const items = await prisma.invoiceItem.findMany({
+    where: {
+      invoiceId,
+      invoice: { communityId },
+      unit: { ownerships: { some: { ownerId: userId, endDate: null } } },
+    },
+    include: {
+      payments: { select: { amount: true } },
+      invoice: { select: { concept: true, dueDate: true } },
+      unit: { select: { label: true } },
+    },
+  });
+
+  const lineItems = items
+    .map(item => {
+      const paid = item.payments.reduce((s, p) => s + Number(p.amount), 0);
+      const pending = Math.round((Number(item.amount) - paid) * 100);
+      if (pending <= 0) return null;
+      return {
+        price_data: {
+          currency: 'eur',
+          product_data: { name: `${item.invoice.concept} – ${item.unit.label}` },
+          unit_amount: pending,
+        },
+        quantity: 1 as const,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (lineItems.length === 0) throw new Error('No hay importes pendientes');
+
+  const customer = await getOrCreateStripeCustomer(userId);
+  const session = await stripe.checkout.sessions.create({
+    customer,
+    payment_method_types: ['card'],
+    line_items: lineItems,
+    mode: 'payment',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: { invoiceId, userId, type: 'invoice_payment' },
+  });
+  return session.url!;
+}
+
 export async function handleWebhook(rawBody: Buffer, signature: string): Promise<void> {
   let event: StripeEvent;
   try {

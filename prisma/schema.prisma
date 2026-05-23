@@ -81,6 +81,7 @@ model User {
   recordedReadings         MeterReading[]     @relation("MeterReadingRecorder")
   createdSuppliers         Supplier[]         @relation("SupplierCreator")
   pushSubscriptions        PushSubscription[]
+  notifications            Notification[]
 
   @@index([email])
   @@index([role])
@@ -906,4 +907,19 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ─── In-app Notifications ────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  url       String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

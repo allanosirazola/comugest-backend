@@ -10,6 +10,7 @@ communityInvoicesRouter.use(requireRole('ADMIN_FINCAS', 'SUPPORT'));
 communityInvoicesRouter.get('/', asyncHandler(controller.listByCommunity));
 communityInvoicesRouter.post('/', asyncHandler(controller.create));
 communityInvoicesRouter.get('/overdue', asyncHandler(controller.overdue));
+communityInvoicesRouter.post('/bulk', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.createBulk));
 communityInvoicesRouter.post('/:invoiceId/sepa', asyncHandler(controller.exportSepa));
 communityInvoicesRouter.get('/:invoiceId/pdf', asyncHandler(controller.exportPdf));
 

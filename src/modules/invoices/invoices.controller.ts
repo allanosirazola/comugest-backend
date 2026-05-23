@@ -8,6 +8,7 @@ import {
   createPaymentSchema,
   listInvoicesQuerySchema,
   sepaExportSchema,
+  bulkInvoiceSchema,
 } from './invoices.schemas';
 import { UnauthorizedError } from '../../utils/errors';
 
@@ -113,4 +114,14 @@ export async function exportPdf(req: Request, res: Response): Promise<void> {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoiceId}.pdf"`);
   res.send(buffer);
+}
+
+// ─── Bulk Invoice ────────────────────────────────────────────
+
+export async function createBulk(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { communityId } = z.object({ communityId: z.string().cuid() }).parse(req.params);
+  const input = bulkInvoiceSchema.parse(req.body);
+  const invoice = await service.createBulkInvoice(user.id, user.role, communityId, input);
+  res.status(201).json({ invoice });
 }

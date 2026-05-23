@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import * as service from './billing.service';
 import { env } from '../../config/env';
+import { UnauthorizedError } from '../../utils/errors';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 function getFrontendUrl(req: Request): string {
   return env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
@@ -42,3 +45,23 @@ export async function webhook(req: Request, res: Response, _next: NextFunction) 
     res.status(400).json({ error: { message: (e as Error).message } });
   }
 }
+
+export async function invoiceCheckout(req: Request, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthorizedError();
+  const { communityId, invoiceId } = z.object({
+    communityId: z.string().cuid(),
+    invoiceId: z.string().cuid(),
+  }).parse(req.params);
+  const origin = req.headers.origin ?? 'http://localhost:5173';
+  const url = await service.createInvoiceCheckoutSession(
+    req.user.id,
+    communityId,
+    invoiceId,
+    `${origin}/mis-facturas?paid=1`,
+    `${origin}/mis-facturas`,
+  );
+  res.json({ url });
+}
+
+// re-export asyncHandler so the router can use it without a separate import
+export { asyncHandler };

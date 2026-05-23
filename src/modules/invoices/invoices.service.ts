@@ -410,6 +410,46 @@ export async function cancelInvoice(userId: string, userRole: UserRole, invoiceI
  * Devuelve los items en estado OVERDUE o no pagados, agrupados por unidad y por
  * vecino propietario, con totales pendientes. Vista de moros para el admin.
  */
+export async function createBulkInvoice(
+  actorId: string,
+  actorRole: UserRole,
+  communityId: string,
+  input: { concept: string; dueDate: string; distributionMode: 'EQUAL'; perUnitAmount: number; issueDate?: string }
+) {
+  await assertCommunityAccess(actorId, actorRole, communityId);
+
+  const units = await prisma.unit.findMany({
+    where: { communityId },
+    orderBy: { label: 'asc' },
+  });
+  if (units.length === 0) throw new ValidationError('La comunidad no tiene unidades');
+
+  const perUnit = input.perUnitAmount;
+  const totalAmount = round2(perUnit * units.length);
+
+  const invoice = await prisma.invoice.create({
+    data: {
+      communityId,
+      concept: input.concept,
+      type: 'DERRAMA',
+      totalAmount: new Prisma.Decimal(totalAmount),
+      issueDate: input.issueDate ? new Date(input.issueDate) : new Date(),
+      dueDate: new Date(input.dueDate),
+      issuedById: actorId,
+      items: {
+        create: units.map(u => ({
+          unitId: u.id,
+          amount: new Prisma.Decimal(perUnit.toFixed(2)),
+        })),
+      },
+    },
+    include: { items: true },
+  });
+
+  void audit({ actorId, communityId, action: 'INVOICE_CREATED', targetType: 'Invoice', targetId: invoice.id, meta: { bulk: true, units: units.length } });
+  return invoice;
+}
+
 export async function listOverdueByOwner(userId: string, userRole: UserRole, communityId: string) {
   await assertCommunityAccess(userId, userRole, communityId);
 
