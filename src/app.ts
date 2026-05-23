@@ -22,6 +22,7 @@ import { communityMeetingsRouter, meetingsRouter, meMeetingsRouter } from './mod
 import { meProfileRouter } from './modules/me/me.router';
 import { communityRecurringRouter } from './modules/recurring-invoices/recurring-invoices.router';
 import { communityDocumentsRouter } from './modules/documents/documents.router';
+import { communityReportsRouter } from './modules/reports/reports.router';
 import { meDocumentsRouter } from './modules/me/me.router';
 import { communityCoAdminsRouter } from './modules/co-admins/co-admins.router';
 import { meetingPollsRouter } from './modules/polls/polls.router';
@@ -66,6 +67,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/budgets', communityBudgetsRouter);
   app.use('/api/v1/communities/:communityId/recurring', communityRecurringRouter);
   app.use('/api/v1/communities/:communityId/documents', communityDocumentsRouter);
+  app.use('/api/v1/communities/:communityId/reports', communityReportsRouter);
   app.use('/api/v1/communities/:communityId/co-admins', communityCoAdminsRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
