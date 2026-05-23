@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import * as QRCode from 'qrcode';
 import { z } from 'zod';
 import * as service from './meetings.service';
 import { createMeetingSchema, updateMeetingSchema, updateAttendanceSchema } from './meetings.schemas';
@@ -67,4 +68,20 @@ export async function publishMinutes(req: Request, res: Response): Promise<void>
   const { published } = z.object({ published: z.boolean() }).parse(req.body);
   const meeting = await service.publishMinutes(user.id, user.role, id, published);
   res.json({ meeting });
+}
+
+export async function generateQr(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { id } = z.object({ id: z.string().cuid() }).parse(req.params);
+  const result = await service.generateQrToken(user.id, user.role, id);
+  const origin = (req.headers.origin as string | undefined) ?? 'https://comugest.app';
+  const qrDataUrl = await QRCode.toDataURL(`${origin}${result.url}`);
+  res.json({ token: result.token, qrDataUrl, url: result.url });
+}
+
+export async function qrCheckIn(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { token } = z.object({ token: z.string() }).parse(req.params);
+  await service.checkInWithQr(token, user.id);
+  res.status(204).send();
 }

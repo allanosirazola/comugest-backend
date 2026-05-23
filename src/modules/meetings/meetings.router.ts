@@ -20,6 +20,10 @@ meetingsRouter.put('/:id/minutes', requireRole('ADMIN_FINCAS', 'SUPPORT'), async
 // PATCH /api/v1/meetings/:id/minutes/publish — toggle published (admin)
 meetingsRouter.patch('/:id/minutes/publish', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.publishMinutes));
 
+// QR check-in
+meetingsRouter.post('/:id/qr-token', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.generateQr));
+meetingsRouter.post('/qr-check-in/:token', asyncHandler(controller.qrCheckIn));
+
 // Vecino: /me/meetings
 export const meMeetingsRouter: Router = Router();
 meMeetingsRouter.use(authenticate);

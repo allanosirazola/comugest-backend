@@ -33,6 +33,7 @@ import { billingRouter } from './modules/billing/billing.router';
 import { pushRouter } from './modules/push/push.router';
 import notificationsRouter from './modules/notifications/notifications.router';
 import { startScheduler } from './modules/scheduler/scheduler';
+import { meWaitlistRouter, areaWaitlistRouter } from './modules/reservations/waitlist.router';
 
 export function createApp(): Express {
   const app = express();
@@ -110,6 +111,8 @@ export function createApp(): Express {
   app.use('/api/v1/billing', billingRouter);
   app.use('/api/v1/push', pushRouter);
   app.use('/api/v1/me/notifications', notificationsRouter);
+  app.use('/api/v1/me', meWaitlistRouter);
+  app.use('/api/v1/communities/:communityId/areas/:areaId/waitlist', areaWaitlistRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

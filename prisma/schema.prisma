@@ -82,6 +82,7 @@ model User {
   createdSuppliers         Supplier[]         @relation("SupplierCreator")
   pushSubscriptions        PushSubscription[]
   notifications            Notification[]
+  waitlistEntries          ReservationWaitlist[] @relation("WaitlistUser")
 
   @@index([email])
   @@index([role])
@@ -624,6 +625,7 @@ model CommonArea {
   updatedAt     DateTime  @updatedAt
 
   reservations Reservation[]
+  waitlist     ReservationWaitlist[]
 
   @@index([communityId])
 }
@@ -893,6 +895,23 @@ model Supplier {
   expenses    Expense[] @relation("ExpenseSupplier")
 
   @@index([communityId])
+}
+
+// ─── Reservation Waitlist ─────────────────────────────────────
+
+model ReservationWaitlist {
+  id         String     @id @default(cuid())
+  areaId     String
+  area       CommonArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User       @relation("WaitlistUser", fields: [userId], references: [id], onDelete: Cascade)
+  startTime  DateTime
+  endTime    DateTime
+  notified   Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+
+  @@unique([areaId, userId, startTime, endTime])
+  @@index([areaId, startTime])
 }
 
 // ─── Web Push Subscriptions ──────────────────────────────────

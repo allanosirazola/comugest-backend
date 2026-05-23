@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { prisma } from '../../config/prisma';
 import { audit } from '../audit/audit.service';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
@@ -210,4 +211,46 @@ export async function publishMinutes(
 
   void audit({ action: 'MINUTES_PUBLISHED', actorId, communityId: meeting.communityId, meta: { meetingId, published } });
   return updated;
+}
+
+// ─── In-memory QR token store (resets on restart, fine for meeting use) ──────
+
+const qrTokens = new Map<string, { meetingId: string; expiresAt: number }>();
+
+export async function generateQrToken(
+  actorId: string,
+  actorRole: UserRole,
+  meetingId: string,
+): Promise<{ token: string; url: string }> {
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { communityId: true },
+  });
+  if (!meeting) throw new NotFoundError('Reunión no encontrada');
+  await assertCommunityAccess(actorId, actorRole, meeting.communityId);
+
+  const token = crypto.randomBytes(24).toString('hex');
+  qrTokens.set(token, { meetingId, expiresAt: Date.now() + 4 * 60 * 60 * 1000 });
+  return { token, url: `/meetings/qr-check-in/${token}` };
+}
+
+export async function checkInWithQr(token: string, userId: string): Promise<void> {
+  const entry = qrTokens.get(token);
+  if (!entry || Date.now() > entry.expiresAt) throw new ValidationError('QR inválido o expirado');
+  qrTokens.delete(token);
+
+  // Mark attendance as CONFIRMED
+  const existing = await prisma.meetingAttendee.findFirst({
+    where: { meetingId: entry.meetingId, userId },
+  });
+  if (existing) {
+    await prisma.meetingAttendee.update({
+      where: { id: existing.id },
+      data: { status: 'CONFIRMED' },
+    });
+  } else {
+    await prisma.meetingAttendee.create({
+      data: { meetingId: entry.meetingId, userId, status: 'CONFIRMED' },
+    });
+  }
 }
