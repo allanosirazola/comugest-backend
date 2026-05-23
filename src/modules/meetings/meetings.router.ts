@@ -19,6 +19,8 @@ meetingsRouter.patch('/:id/attendance', asyncHandler(controller.updateMyAttendan
 meetingsRouter.put('/:id/minutes', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.saveMinutes));
 // PATCH /api/v1/meetings/:id/minutes/publish — toggle published (admin)
 meetingsRouter.patch('/:id/minutes/publish', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.publishMinutes));
+// POST /api/v1/meetings/:id/minutes/sign — sign minutes with TOTP (admin)
+meetingsRouter.post('/:id/minutes/sign', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.signMinutes));
 
 // QR check-in
 meetingsRouter.post('/:id/qr-token', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.generateQr));

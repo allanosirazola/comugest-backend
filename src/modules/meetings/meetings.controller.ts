@@ -85,3 +85,11 @@ export async function qrCheckIn(req: Request, res: Response): Promise<void> {
   await service.checkInWithQr(token, user.id);
   res.status(204).send();
 }
+
+export async function signMinutes(req: Request, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthorizedError();
+  const id = z.string().cuid().parse(req.params.id);
+  const { totpCode } = z.object({ totpCode: z.string().length(6).regex(/^\d{6}$/) }).parse(req.body);
+  const meeting = await service.signMinutes(req.user.id, req.user.role, id, totpCode);
+  res.json({ meeting });
+}

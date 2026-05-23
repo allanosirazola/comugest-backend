@@ -1,10 +1,17 @@
 import crypto from 'crypto';
 import { prisma } from '../../config/prisma';
 import { audit } from '../audit/audit.service';
-import { ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
+import { ForbiddenError, NotFoundError, ValidationError, UnauthorizedError } from '../../utils/errors';
 import { assertCommunityAccess } from '../../utils/authz';
 import type { UserRole } from '@prisma/client';
 import type { CreateMeetingInput, UpdateMeetingInput, UpdateAttendanceInput } from './meetings.schemas';
+import type { Meeting } from '@prisma/client';
+import { verifySync, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+
+const totpPlugins = {
+  crypto: new NobleCryptoPlugin(),
+  encoding: new ScureBase32Plugin(),
+};
 
 export async function listMeetings(communityId: string) {
   return prisma.meeting.findMany({
@@ -210,6 +217,45 @@ export async function publishMinutes(
   });
 
   void audit({ action: 'MINUTES_PUBLISHED', actorId, communityId: meeting.communityId, meta: { meetingId, published } });
+  return updated;
+}
+
+export async function signMinutes(actorId: string, actorRole: UserRole, meetingId: string, totpCode: string): Promise<Meeting> {
+  const meeting = await prisma.meeting.findUniqueOrThrow({
+    where: { id: meetingId },
+    include: { community: true },
+  });
+  await assertCommunityAccess(actorId, actorRole, meeting.communityId);
+
+  if (!meeting.minutes) throw new ValidationError('No hay acta redactada para firmar');
+  if (meeting.minutesSignedAt) throw new ValidationError('El acta ya está firmada');
+
+  // Verify TOTP
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: actorId },
+    select: { totpSecret: true, totpEnabled: true },
+  });
+  if (!user.totpEnabled || !user.totpSecret) {
+    throw new ValidationError('Debes tener 2FA activado para firmar el acta');
+  }
+  const result = verifySync({ ...totpPlugins, secret: user.totpSecret, token: totpCode, strategy: 'totp' });
+  if (!result.valid) throw new UnauthorizedError('Código 2FA incorrecto');
+
+  const now = new Date();
+  const payload = `${meeting.minutes}|${actorId}|${now.toISOString()}`;
+  const hash = crypto.createHash('sha256').update(payload).digest('hex');
+
+  const updated = await prisma.meeting.update({
+    where: { id: meetingId },
+    data: {
+      minutesSignedAt: now,
+      minutesSignedById: actorId,
+      minutesSignatureHash: hash,
+    },
+    include: { minutesSignedBy: { select: { firstName: true, lastName: true, email: true } } },
+  });
+
+  void audit({ actorId, communityId: meeting.communityId, action: 'MINUTES_PUBLISHED', targetId: meetingId, meta: { signed: true, hash: hash.slice(0, 16) } });
   return updated;
 }
 

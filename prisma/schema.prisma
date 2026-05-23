@@ -73,6 +73,7 @@ model User {
   reservations        Reservation[]     @relation("ReservationUser")
   cancelledReservations Reservation[]   @relation("ReservationCanceller")
   organizedMeetings   Meeting[]         @relation("MeetingOrganizer")
+  signedMinutes       Meeting[]         @relation("MinutesSigner")
   meetingAttendances  MeetingAttendee[]
   createdRecurringInvoices RecurringInvoice[] @relation("RecurringInvoiceCreator")
   uploadedDocuments        Document[]         @relation("DocumentUploader")
@@ -149,6 +150,7 @@ model Community {
   recurringInvoices RecurringInvoice[]
   documents         Document[]
   suppliers         Supplier[]
+  bankAccounts      BankAccount[]
 
   @@index([name])
 }
@@ -679,7 +681,11 @@ model Meeting {
   agenda          String?
   minutes          String?
   minutesUpdatedAt DateTime?
-  minutesPublished Boolean   @default(false)
+  minutesPublished     Boolean   @default(false)
+  minutesSignedAt      DateTime?
+  minutesSignedById    String?
+  minutesSignedBy      User?     @relation("MinutesSigner", fields: [minutesSignedById], references: [id])
+  minutesSignatureHash String?
   minutesUrl      String?
   organizedById   String
   organizedBy     User          @relation("MeetingOrganizer", fields: [organizedById], references: [id], onDelete: Restrict)
@@ -941,4 +947,38 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ─── Banking Integration ─────────────────────────────────────
+
+model BankAccount {
+  id              String   @id @default(cuid())
+  communityId     String
+  community       Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  institutionName String
+  iban            String?
+  connectionId    String?  // GoCardless requisition ID
+  status          String   @default("PENDING") // PENDING | ACTIVE | EXPIRED | ERROR
+  accessToken     String?
+  accessExpiry    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  transactions    BankTransaction[]
+
+  @@index([communityId])
+}
+
+model BankTransaction {
+  id              String      @id @default(cuid())
+  bankAccountId   String
+  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  transactionDate DateTime
+  amount          Decimal     @db.Decimal(12, 2)
+  description     String
+  reference       String?
+  matchedItemId   String?     // FK to InvoiceItem if reconciled
+  reconciledAt    DateTime?
+  createdAt       DateTime    @default(now())
+
+  @@index([bankAccountId, transactionDate])
 }
