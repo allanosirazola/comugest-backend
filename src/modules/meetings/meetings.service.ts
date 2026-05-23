@@ -1,6 +1,8 @@
 import { prisma } from '../../config/prisma';
 import { audit } from '../audit/audit.service';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
+import { assertCommunityAccess } from '../../utils/authz';
+import type { UserRole } from '@prisma/client';
 import type { CreateMeetingInput, UpdateMeetingInput, UpdateAttendanceInput } from './meetings.schemas';
 
 export async function listMeetings(communityId: string) {
@@ -162,4 +164,50 @@ export async function updateAttendance(
       proxy: input.proxy ?? null,
     },
   });
+}
+
+export async function saveMinutes(
+  actorId: string,
+  actorRole: UserRole,
+  meetingId: string,
+  minutes: string,
+) {
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { id: true, communityId: true },
+  });
+  if (!meeting) throw new NotFoundError('Meeting not found');
+  await assertCommunityAccess(actorId, actorRole, meeting.communityId);
+
+  const updated = await prisma.meeting.update({
+    where: { id: meetingId },
+    data: { minutes, minutesUpdatedAt: new Date() },
+    select: { id: true, title: true, minutes: true, minutesUpdatedAt: true, minutesPublished: true },
+  });
+
+  void audit({ action: 'MINUTES_SAVED', actorId, communityId: meeting.communityId, meta: { meetingId } });
+  return updated;
+}
+
+export async function publishMinutes(
+  actorId: string,
+  actorRole: UserRole,
+  meetingId: string,
+  published: boolean,
+) {
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { id: true, communityId: true },
+  });
+  if (!meeting) throw new NotFoundError('Meeting not found');
+  await assertCommunityAccess(actorId, actorRole, meeting.communityId);
+
+  const updated = await prisma.meeting.update({
+    where: { id: meetingId },
+    data: { minutesPublished: published },
+    select: { id: true, title: true, minutes: true, minutesUpdatedAt: true, minutesPublished: true },
+  });
+
+  void audit({ action: 'MINUTES_PUBLISHED', actorId, communityId: meeting.communityId, meta: { meetingId, published } });
+  return updated;
 }

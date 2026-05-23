@@ -15,6 +15,10 @@ meetingsRouter.use(authenticate);
 meetingsRouter.get('/:id', asyncHandler(controller.get));
 meetingsRouter.patch('/:id', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.update));
 meetingsRouter.patch('/:id/attendance', asyncHandler(controller.updateMyAttendance));
+// PUT /api/v1/meetings/:id/minutes — save minutes (admin)
+meetingsRouter.put('/:id/minutes', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.saveMinutes));
+// PATCH /api/v1/meetings/:id/minutes/publish — toggle published (admin)
+meetingsRouter.patch('/:id/minutes/publish', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.publishMinutes));
 
 // Vecino: /me/meetings
 export const meMeetingsRouter: Router = Router();

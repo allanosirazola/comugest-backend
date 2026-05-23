@@ -667,7 +667,9 @@ model Meeting {
   scheduledAt     DateTime
   location        String?
   agenda          String?
-  minutes         String?
+  minutes          String?
+  minutesUpdatedAt DateTime?
+  minutesPublished Boolean   @default(false)
   minutesUrl      String?
   organizedById   String
   organizedBy     User          @relation("MeetingOrganizer", fields: [organizedById], references: [id], onDelete: Restrict)
@@ -742,6 +744,8 @@ enum AuditAction {
   CO_ADMIN_ADDED
   CO_ADMIN_REMOVED
   METER_READING_ADDED
+  MINUTES_SAVED
+  MINUTES_PUBLISHED
 }
 
 model AuditLog {
@@ -803,29 +807,33 @@ enum PollStatus {
 }
 
 model Poll {
-  id          String     @id @default(cuid())
-  meetingId   String
-  meeting     Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  question    String
-  description String?
-  status      PollStatus @default(OPEN)
-  createdById String
-  createdBy   User       @relation("PollCreator", fields: [createdById], references: [id])
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  votes       Vote[]
+  id                 String     @id @default(cuid())
+  meetingId          String
+  meeting            Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  question           String
+  description        String?
+  status             PollStatus @default(OPEN)
+  votingDeadline     DateTime?
+  requiresAttendance Boolean    @default(false)
+  quorumReached      Boolean?
+  createdById        String
+  createdBy          User       @relation("PollCreator", fields: [createdById], references: [id])
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  votes              Vote[]
 
   @@index([meetingId])
 }
 
 model Vote {
-  id        String     @id @default(cuid())
-  pollId    String
-  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User       @relation("VoteCaster", fields: [userId], references: [id])
-  option    VoteOption
-  createdAt DateTime   @default(now())
+  id          String     @id @default(cuid())
+  pollId      String
+  poll        Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation("VoteCaster", fields: [userId], references: [id])
+  option      VoteOption
+  isTelematic Boolean    @default(true)
+  createdAt   DateTime   @default(now())
 
   @@unique([pollId, userId])
   @@index([pollId])

@@ -13,17 +13,28 @@ export async function listPolls(meetingId: string, userId: string) {
     include: {
       _count: { select: { votes: true } },
       votes: {
-        select: { option: true, userId: true },
+        select: { option: true, userId: true, isTelematic: true },
       },
     },
   });
 
   return polls.map((poll) => {
-    const results: Record<VoteOption, number> = { FAVOR: 0, CONTRA: 0, ABSTENCION: 0 };
+    const results: Record<VoteOption, number> & { telematic: number; inPerson: number } = {
+      FAVOR: 0,
+      CONTRA: 0,
+      ABSTENCION: 0,
+      telematic: 0,
+      inPerson: 0,
+    };
     let myVote: VoteOption | null = null;
 
     for (const vote of poll.votes) {
       results[vote.option] = (results[vote.option] ?? 0) + 1;
+      if (vote.isTelematic) {
+        results.telematic += 1;
+      } else {
+        results.inPerson += 1;
+      }
       if (vote.userId === userId) {
         myVote = vote.option;
       }
@@ -58,6 +69,8 @@ export async function createPoll(
       meetingId,
       question: input.question,
       description: input.description ?? null,
+      votingDeadline: input.votingDeadline ?? null,
+      requiresAttendance: input.requiresAttendance ?? false,
       createdById: actorId,
     },
     include: {
@@ -92,9 +105,20 @@ export async function closePoll(actorId: string, actorRole: UserRole, pollId: st
     throw new ValidationError('La votación ya está cerrada');
   }
 
+  // Compute quorumReached: votes cast vs total attendees of the meeting
+  let quorumReached: boolean | null = null;
+  const totalAttendees = await prisma.meetingAttendee.count({
+    where: { meetingId: poll.meetingId },
+  });
+
+  if (totalAttendees > 0) {
+    const votesCast = await prisma.vote.count({ where: { pollId } });
+    quorumReached = votesCast / totalAttendees > 0.5;
+  }
+
   const updated = await prisma.poll.update({
     where: { id: pollId },
-    data: { status: 'CLOSED' },
+    data: { status: 'CLOSED', quorumReached },
   });
 
   void audit({
@@ -103,7 +127,7 @@ export async function closePoll(actorId: string, actorRole: UserRole, pollId: st
     targetType: 'Poll',
     targetId: pollId,
     communityId: poll.meeting.communityId,
-    meta: { question: poll.question, meetingId: poll.meetingId },
+    meta: { question: poll.question, meetingId: poll.meetingId, quorumReached },
   });
 
   return updated;
@@ -120,15 +144,41 @@ export async function castVote(userId: string, pollId: string, input: CastVoteIn
     throw new ValidationError('No se puede votar en una votación cerrada');
   }
 
+  // Check voting deadline
+  if (poll.votingDeadline !== null && poll.votingDeadline < new Date()) {
+    throw new ValidationError('Voting period has ended');
+  }
+
+  // Check requiresAttendance: user must be a MeetingAttendee
+  if (poll.requiresAttendance) {
+    const attendee = await prisma.meetingAttendee.findUnique({
+      where: { meetingId_userId: { meetingId: poll.meetingId, userId } },
+    });
+    if (!attendee) {
+      throw new ForbiddenError('You must be a meeting attendee to vote');
+    }
+  }
+
+  // Determine isTelematic: false if user has MeetingAttendee record with status PRESENT
+  // Note: AttendanceStatus enum has PENDING | CONFIRMED | DECLINED | DELEGATED — no PRESENT
+  // We treat CONFIRMED as in-person presence (physically attending)
+  const attendeeRecord = await prisma.meetingAttendee.findUnique({
+    where: { meetingId_userId: { meetingId: poll.meetingId, userId } },
+  });
+  // CONFIRMED = attending in person, not telematic
+  const isTelematic = !(attendeeRecord?.status === 'CONFIRMED');
+
   const vote = await prisma.vote.upsert({
     where: { pollId_userId: { pollId, userId } },
     create: {
       pollId,
       userId,
       option: input.option,
+      isTelematic,
     },
     update: {
       option: input.option,
+      isTelematic,
     },
   });
 
@@ -138,7 +188,7 @@ export async function castVote(userId: string, pollId: string, input: CastVoteIn
     targetType: 'Vote',
     targetId: vote.id,
     communityId: poll.meeting.communityId,
-    meta: { pollId, option: input.option },
+    meta: { pollId, option: input.option, isTelematic },
   });
 
   return vote;

@@ -52,3 +52,19 @@ export async function updateMyAttendance(req: Request, res: Response): Promise<v
   const attendee = await service.updateAttendance(user.id, id, input);
   res.json({ attendee });
 }
+
+export async function saveMinutes(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { id } = z.object({ id: z.string().cuid() }).parse(req.params);
+  const { minutes } = z.object({ minutes: z.string() }).parse(req.body);
+  const meeting = await service.saveMinutes(user.id, user.role, id, minutes);
+  res.json({ meeting });
+}
+
+export async function publishMinutes(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { id } = z.object({ id: z.string().cuid() }).parse(req.params);
+  const { published } = z.object({ published: z.boolean() }).parse(req.body);
+  const meeting = await service.publishMinutes(user.id, user.role, id, published);
+  res.json({ meeting });
+}
