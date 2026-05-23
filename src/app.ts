@@ -27,6 +27,8 @@ import { meDocumentsRouter } from './modules/me/me.router';
 import { communityCoAdminsRouter } from './modules/co-admins/co-admins.router';
 import { meetingPollsRouter } from './modules/polls/polls.router';
 import { communityMeterReadingsRouter } from './modules/meter-readings/meter-readings.router';
+import { communityCalendarRouter, meCalendarRouter } from './modules/calendar/calendar.router';
+import { communitySupplierRouter } from './modules/suppliers/suppliers.router';
 
 export function createApp(): Express {
   const app = express();
@@ -71,6 +73,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/reports', communityReportsRouter);
   app.use('/api/v1/communities/:communityId/co-admins', communityCoAdminsRouter);
   app.use('/api/v1/communities/:communityId/meter-readings', communityMeterReadingsRouter);
+  app.use('/api/v1/communities/:communityId/suppliers', communitySupplierRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
   app.use('/api/v1/messages', messagesRoutes);
@@ -95,6 +98,8 @@ export function createApp(): Express {
   app.use('/api/v1/me', meReservationsRouter);
   app.use('/api/v1/me', meMeetingsRouter);
   app.use('/api/v1/me', meDocumentsRouter);
+  app.use('/api/v1/communities/:communityId/calendar', communityCalendarRouter);
+  app.use('/api/v1/me', meCalendarRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
