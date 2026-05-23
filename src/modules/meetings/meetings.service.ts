@@ -7,6 +7,8 @@ import type { UserRole } from '@prisma/client';
 import type { CreateMeetingInput, UpdateMeetingInput, UpdateAttendanceInput } from './meetings.schemas';
 import type { Meeting } from '@prisma/client';
 import { verifySync, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+import { sendToCommunity } from '../push/push.service';
+import { createNotificationsForCommunity } from '../notifications/notifications.service';
 
 const totpPlugins = {
   crypto: new NobleCryptoPlugin(),
@@ -91,6 +93,17 @@ export async function createMeeting(
     targetId: meeting.id,
     communityId,
     meta: { title: meeting.title, type: meeting.type },
+  });
+
+  void sendToCommunity(communityId, {
+    title: input.title,
+    body: `Nueva junta convocada para el ${new Date(input.scheduledAt).toLocaleDateString('es-ES')}`,
+    url: `/communities/${communityId}/meetings/${meeting.id}`,
+  });
+  void createNotificationsForCommunity(communityId, {
+    title: input.title,
+    body: `Nueva junta convocada para el ${new Date(input.scheduledAt).toLocaleDateString('es-ES')}`,
+    url: `/communities/${communityId}/meetings/${meeting.id}`,
   });
 
   return meeting;
@@ -257,6 +270,55 @@ export async function signMinutes(actorId: string, actorRole: UserRole, meetingI
 
   void audit({ actorId, communityId: meeting.communityId, action: 'MINUTES_PUBLISHED', targetId: meetingId, meta: { signed: true, hash: hash.slice(0, 16) } });
   return updated;
+}
+
+export async function exportMinutesPdf(actorId: string, actorRole: UserRole, meetingId: string): Promise<Buffer> {
+  const meeting = await prisma.meeting.findUniqueOrThrow({
+    where: { id: meetingId },
+    include: {
+      community: true,
+      minutesSignedBy: { select: { firstName: true, lastName: true, email: true } },
+    },
+  });
+  await assertCommunityAccess(actorId, actorRole, meeting.communityId);
+  if (!meeting.minutes) throw new Error('No hay acta redactada');
+  if (!meeting.minutesPublished) throw new Error('El acta no está publicada');
+
+  const PDFDocument = (await import('pdfkit')).default;
+  const doc = new PDFDocument({ margin: 60 });
+  const chunks: Buffer[] = [];
+  doc.on('data', (c: Buffer) => chunks.push(c));
+
+  return new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('ACTA DE JUNTA DE PROPIETARIOS', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica').text(meeting.community.name, { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(10).text(`Fecha: ${new Date(meeting.scheduledAt).toLocaleDateString('es-ES')}`, { align: 'center' });
+    if (meeting.location) doc.text(`Lugar: ${meeting.location}`, { align: 'center' });
+    doc.moveDown(1.5);
+
+    // Minutes content
+    doc.fontSize(11).font('Helvetica').text(meeting.minutes ?? '', { lineGap: 4 });
+    doc.moveDown(2);
+
+    // Signature block
+    if (meeting.minutesSignedAt && meeting.minutesSignedBy) {
+      doc.moveTo(60, doc.y).lineTo(535, doc.y).stroke('#cccccc');
+      doc.moveDown(0.5);
+      doc.fontSize(9).font('Helvetica').fillColor('#666666')
+        .text(`Firmado digitalmente el ${new Date(meeting.minutesSignedAt).toLocaleString('es-ES')}`, { align: 'center' })
+        .text(`por ${meeting.minutesSignedBy.firstName} ${meeting.minutesSignedBy.lastName} (${meeting.minutesSignedBy.email})`, { align: 'center' })
+        .moveDown(0.3);
+      doc.font('Courier').text(`SHA-256: ${meeting.minutesSignatureHash}`, { align: 'center' });
+    }
+
+    doc.end();
+  });
 }
 
 // ─── In-memory QR token store (resets on restart, fine for meeting use) ──────

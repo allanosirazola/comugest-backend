@@ -11,6 +11,8 @@ import { distributeByCoefficient, eurosToCents, centsToEuros } from '../../utils
 import { sendEmail } from '../email/email.service';
 import { buildFrontendUrl } from '../email/templates';
 import type { CreateInvoiceInput, CreatePaymentInput, ListInvoicesQuery } from './invoices.schemas';
+import { sendToUser } from '../push/push.service';
+import { createNotification } from '../notifications/notifications.service';
 
 // ─── Estado calculado ───────────────────────────────────────
 
@@ -161,6 +163,39 @@ export async function createInvoice(
   await notifyInvoiceIssued(invoice).catch(() => {
     // No bloqueamos la creación si el envío falla. Lo loguea el servicio de email.
   });
+
+  // Notify unit owners asynchronously via push + in-app notifications
+  void (async () => {
+    try {
+      const items = await prisma.invoiceItem.findMany({
+        where: { invoiceId: invoice.id },
+        include: {
+          unit: {
+            include: {
+              ownerships: {
+                where: { endDate: null },
+                include: { owner: { select: { id: true, firstName: true } } },
+              },
+            },
+          },
+        },
+      });
+      for (const item of items) {
+        for (const ownership of item.unit.ownerships) {
+          void sendToUser(ownership.owner.id, {
+            title: 'Nueva factura',
+            body: `${invoice.concept} — ${Number(item.amount).toFixed(2)} €`,
+            url: '/my-invoices',
+          });
+          void createNotification(ownership.owner.id, {
+            title: 'Nueva factura',
+            body: `${invoice.concept} — ${Number(item.amount).toFixed(2)} €`,
+            url: '/my-invoices',
+          });
+        }
+      }
+    } catch {}
+  })();
 
   void audit({
     action: 'INVOICE_CREATED',
@@ -447,6 +482,40 @@ export async function createBulkInvoice(
   });
 
   void audit({ actorId, communityId, action: 'INVOICE_CREATED', targetType: 'Invoice', targetId: invoice.id, meta: { bulk: true, units: units.length } });
+
+  // Notify unit owners asynchronously via push + in-app notifications
+  void (async () => {
+    try {
+      const items = await prisma.invoiceItem.findMany({
+        where: { invoiceId: invoice.id },
+        include: {
+          unit: {
+            include: {
+              ownerships: {
+                where: { endDate: null },
+                include: { owner: { select: { id: true, firstName: true } } },
+              },
+            },
+          },
+        },
+      });
+      for (const item of items) {
+        for (const ownership of item.unit.ownerships) {
+          void sendToUser(ownership.owner.id, {
+            title: 'Nueva factura',
+            body: `${invoice.concept} — ${Number(item.amount).toFixed(2)} €`,
+            url: '/my-invoices',
+          });
+          void createNotification(ownership.owner.id, {
+            title: 'Nueva factura',
+            body: `${invoice.concept} — ${Number(item.amount).toFixed(2)} €`,
+            url: '/my-invoices',
+          });
+        }
+      }
+    } catch {}
+  })();
+
   return invoice;
 }
 

@@ -21,6 +21,8 @@ meetingsRouter.put('/:id/minutes', requireRole('ADMIN_FINCAS', 'SUPPORT'), async
 meetingsRouter.patch('/:id/minutes/publish', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.publishMinutes));
 // POST /api/v1/meetings/:id/minutes/sign — sign minutes with TOTP (admin)
 meetingsRouter.post('/:id/minutes/sign', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.signMinutes));
+// GET /api/v1/meetings/:id/minutes/pdf — export minutes as PDF
+meetingsRouter.get('/:id/minutes/pdf', authenticate, asyncHandler(controller.exportMinutesPdf));
 
 // QR check-in
 meetingsRouter.post('/:id/qr-token', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.generateQr));

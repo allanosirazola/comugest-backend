@@ -93,3 +93,12 @@ export async function signMinutes(req: Request, res: Response): Promise<void> {
   const meeting = await service.signMinutes(req.user.id, req.user.role, id, totpCode);
   res.json({ meeting });
 }
+
+export async function exportMinutesPdf(req: Request, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthorizedError();
+  const id = z.string().cuid().parse(req.params.id);
+  const pdf = await service.exportMinutesPdf(req.user.id, req.user.role, id);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="acta-${id.slice(0, 8)}.pdf"`);
+  res.send(pdf);
+}
