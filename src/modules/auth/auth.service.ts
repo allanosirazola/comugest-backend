@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { hashPassword, verifyPassword } from '../../utils/password';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken, signPreAuthToken, verifyPreAuthToken } from '../../utils/jwt';
 import { generateVerificationToken, hashToken } from '../../utils/tokens';
 import { ConflictError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { sendEmail } from '../email/email.service';
@@ -173,12 +173,30 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     throw new ForbiddenError('Tu cuenta aún no ha sido activada. Revisa tu email de invitación');
   }
 
+  if (user.totpEnabled) {
+    const preAuthToken = signPreAuthToken(user.id);
+    return { requiresTwoFactor: true, preAuthToken } as unknown as AuthResponse;
+  }
+
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
   });
 
   return issueTokens(user);
+}
+
+export async function completeTwoFactorLogin(preAuthToken: string, totpCode: string): Promise<AuthResponse> {
+  const payload = verifyPreAuthToken(preAuthToken);
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: payload.sub },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, totpSecret: true, totpEnabled: true, status: true, locale: true },
+  });
+  if (!user.totpEnabled || !user.totpSecret) throw new UnauthorizedError('2FA no está activado');
+  const result = verifySync({ ...totpPlugins, secret: user.totpSecret, token: totpCode, strategy: 'totp' });
+  if (!result.valid) throw new UnauthorizedError('Código 2FA incorrecto');
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  return issueTokens(user as Parameters<typeof issueTokens>[0]);
 }
 
 export async function verifyEmail(rawToken: string): Promise<AuthResponse> {

@@ -22,6 +22,7 @@ const verificationLimiter = rateLimit({
 
 router.post('/register', authLimiter, asyncHandler(authController.register));
 router.post('/login', authLimiter, asyncHandler(authController.login));
+router.post('/login/2fa', authLimiter, asyncHandler(authController.twoFactorLogin));
 router.post('/verify-email', authLimiter, asyncHandler(authController.verifyEmail));
 router.post('/resend-verification', verificationLimiter, asyncHandler(authController.resendVerification));
 router.post('/forgot-password', verificationLimiter, asyncHandler(authController.forgotPassword));

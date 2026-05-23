@@ -59,3 +59,9 @@ export const resetPasswordSchema = z.object({
     .regex(/\d/, 'Debe contener al menos un número'),
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const twoFactorLoginSchema = z.object({
+  preAuthToken: z.string().min(1),
+  totpCode: z.string().length(6).regex(/^\d{6}$/),
+});
+export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
