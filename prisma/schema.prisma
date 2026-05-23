@@ -47,6 +47,8 @@ model User {
   stripeSubscriptionId String?  @unique
   planStatus           String   @default("FREE")
   planCurrentPeriodEnd DateTime?
+  totpSecret           String?
+  totpEnabled          Boolean  @default(false)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
