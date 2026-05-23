@@ -70,6 +70,8 @@ model User {
   meetingAttendances  MeetingAttendee[]
   createdRecurringInvoices RecurringInvoice[] @relation("RecurringInvoiceCreator")
   uploadedDocuments        Document[]         @relation("DocumentUploader")
+  createdPolls             Poll[]             @relation("PollCreator")
+  votes                    Vote[]             @relation("VoteCaster")
 
   @@index([email])
   @@index([role])
@@ -667,6 +669,7 @@ model Meeting {
   updatedAt       DateTime      @updatedAt
 
   attendees MeetingAttendee[]
+  polls     Poll[]
 
   @@index([communityId, scheduledAt])
 }
@@ -724,6 +727,11 @@ enum AuditAction {
   RECURRING_INVOICE_TRIGGERED
   DOCUMENT_CREATED
   DOCUMENT_DELETED
+  POLL_CREATED
+  POLL_CLOSED
+  VOTE_CAST
+  CO_ADMIN_ADDED
+  CO_ADMIN_REMOVED
 }
 
 model AuditLog {
@@ -769,4 +777,46 @@ model Document {
 
   @@index([communityId])
   @@index([communityId, category])
+}
+
+// ─── Votaciones en junta ─────────────────────────────────────
+
+enum VoteOption {
+  FAVOR
+  CONTRA
+  ABSTENCION
+}
+
+enum PollStatus {
+  OPEN
+  CLOSED
+}
+
+model Poll {
+  id          String     @id @default(cuid())
+  meetingId   String
+  meeting     Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  question    String
+  description String?
+  status      PollStatus @default(OPEN)
+  createdById String
+  createdBy   User       @relation("PollCreator", fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  votes       Vote[]
+
+  @@index([meetingId])
+}
+
+model Vote {
+  id        String     @id @default(cuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation("VoteCaster", fields: [userId], references: [id])
+  option    VoteOption
+  createdAt DateTime   @default(now())
+
+  @@unique([pollId, userId])
+  @@index([pollId])
 }
