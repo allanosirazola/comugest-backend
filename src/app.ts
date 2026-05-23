@@ -26,6 +26,7 @@ import { communityReportsRouter } from './modules/reports/reports.router';
 import { meDocumentsRouter } from './modules/me/me.router';
 import { communityCoAdminsRouter } from './modules/co-admins/co-admins.router';
 import { meetingPollsRouter } from './modules/polls/polls.router';
+import { communityMeterReadingsRouter } from './modules/meter-readings/meter-readings.router';
 
 export function createApp(): Express {
   const app = express();
@@ -69,6 +70,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/documents', communityDocumentsRouter);
   app.use('/api/v1/communities/:communityId/reports', communityReportsRouter);
   app.use('/api/v1/communities/:communityId/co-admins', communityCoAdminsRouter);
+  app.use('/api/v1/communities/:communityId/meter-readings', communityMeterReadingsRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
   app.use('/api/v1/messages', messagesRoutes);

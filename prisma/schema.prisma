@@ -72,6 +72,7 @@ model User {
   uploadedDocuments        Document[]         @relation("DocumentUploader")
   createdPolls             Poll[]             @relation("PollCreator")
   votes                    Vote[]             @relation("VoteCaster")
+  recordedReadings         MeterReading[]     @relation("MeterReadingRecorder")
 
   @@index([email])
   @@index([role])
@@ -174,10 +175,11 @@ model Unit {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  ownerships   Ownership[]
-  occupancies  Occupancy[]
-  invoiceItems InvoiceItem[]
-  procedures   Procedure[]
+  ownerships    Ownership[]
+  occupancies   Occupancy[]
+  invoiceItems  InvoiceItem[]
+  procedures    Procedure[]
+  meterReadings MeterReading[]
 
   @@unique([communityId, label])
   @@index([communityId])
@@ -732,6 +734,7 @@ enum AuditAction {
   VOTE_CAST
   CO_ADMIN_ADDED
   CO_ADMIN_REMOVED
+  METER_READING_ADDED
 }
 
 model AuditLog {
@@ -819,4 +822,29 @@ model Vote {
 
   @@unique([pollId, userId])
   @@index([pollId])
+}
+
+// ─── Lecturas de contadores ──────────────────────────────────
+
+enum MeterType {
+  AGUA
+  LUZ
+  GAS
+  OTRO
+}
+
+model MeterReading {
+  id           String    @id @default(cuid())
+  unitId       String
+  unit         Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  type         MeterType @default(AGUA)
+  readingDate  DateTime
+  value        Decimal   @db.Decimal(12, 3)
+  consumption  Decimal?  @db.Decimal(12, 3)
+  notes        String?
+  recordedById String
+  recordedBy   User      @relation("MeterReadingRecorder", fields: [recordedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@index([unitId, type, readingDate])
 }
