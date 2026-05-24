@@ -86,6 +86,7 @@ model User {
   waitlistEntries          ReservationWaitlist[] @relation("WaitlistUser")
   authoredNotes            UnitNote[]            @relation("NoteAuthor")
   incidents                IncidentLog[]         @relation("IncidentReporter")
+  messageTemplates         MessageTemplate[]     @relation("TemplateCreator")
 
   @@index([email])
   @@index([role])
@@ -154,6 +155,7 @@ model Community {
   suppliers         Supplier[]
   bankAccounts      BankAccount[]
   incidentLog       IncidentLog[]
+  messageTemplates  MessageTemplate[]
 
   @@index([name])
 }
@@ -922,6 +924,7 @@ model IncidentLog {
   status       String    @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED
   resolvedAt   DateTime?
   resolution   String?
+  photos       String[]  // base64 data URIs or file URL strings
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -1022,4 +1025,21 @@ model BankTransaction {
   createdAt       DateTime    @default(now())
 
   @@index([bankAccountId, transactionDate])
+}
+
+// ─── Plantillas de mensajes/anuncios ─────────────────────────
+
+model MessageTemplate {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  name        String
+  subject     String
+  body        String
+  createdById String
+  createdBy   User      @relation("TemplateCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([communityId])
 }
