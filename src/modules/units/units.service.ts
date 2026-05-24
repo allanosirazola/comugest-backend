@@ -86,6 +86,22 @@ export async function updateUnit(
   });
 }
 
+export async function getOwnershipHistory(actorId: string, actorRole: UserRole, communityId: string, unitId: string) {
+  await assertCommunityAccess(actorId, actorRole, communityId);
+  const unit = await prisma.unit.findUniqueOrThrow({
+    where: { id: unitId, communityId },
+    include: {
+      ownerships: {
+        include: {
+          owner: { select: { firstName: true, lastName: true, email: true, role: true } },
+        },
+        orderBy: { startDate: 'desc' },
+      },
+    },
+  });
+  return unit.ownerships;
+}
+
 export async function deleteUnit(userId: string, userRole: UserRole, unitId: string) {
   const unit = await getUnitOrThrow(unitId);
   await assertCommunityAccess(userId, userRole, unit.communityId);

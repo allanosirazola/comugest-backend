@@ -36,6 +36,7 @@ import { startScheduler } from './modules/scheduler/scheduler';
 import { meWaitlistRouter, areaWaitlistRouter } from './modules/reservations/waitlist.router';
 import importRouter from './modules/import/import.router';
 import bankingRouter from './modules/banking/banking.router';
+import unitNotesRouter from './modules/units/unit-notes.router';
 
 export function createApp(): Express {
   const app = express();
@@ -117,6 +118,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/areas/:areaId/waitlist', areaWaitlistRouter);
   app.use('/api/v1/communities/:communityId/import/csv', importRouter);
   app.use('/api/v1/communities/:communityId/banking', bankingRouter);
+  app.use('/api/v1/units/:unitId/notes', unitNotesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

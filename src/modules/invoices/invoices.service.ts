@@ -392,7 +392,84 @@ export async function recordPayment(
     meta: { amount: input.amount, invoiceId: item.invoiceId },
   });
 
+  void sendPaymentReceipt(payment.id);
+
   return payment;
+}
+
+async function sendPaymentReceipt(paymentId: string): Promise<void> {
+  try {
+    const payment = await prisma.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+      include: {
+        invoiceItem: {
+          include: {
+            invoice: { include: { community: true } },
+            unit: {
+              include: {
+                ownerships: {
+                  where: { endDate: null },
+                  include: { owner: { select: { email: true, firstName: true, lastName: true, locale: true } } },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const owner = payment.invoiceItem.unit.ownerships[0]?.owner;
+    if (!owner) return;
+
+    const invoice = payment.invoiceItem.invoice;
+    const community = invoice.community;
+    const isEs = owner.locale !== 'en';
+
+    const PDFDocument = (await import('pdfkit')).default;
+    const doc = new PDFDocument({ margin: 60, size: 'A4' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+
+    await new Promise<void>((resolve, reject) => {
+      doc.on('end', resolve);
+      doc.on('error', reject);
+
+      doc.fontSize(18).font('Helvetica-Bold').text(isEs ? 'RECIBO DE PAGO' : 'PAYMENT RECEIPT', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica').text(community.name, { align: 'center' });
+      doc.moveDown(1.5);
+
+      const dateStr = new Date(payment.paidAt ?? new Date()).toLocaleDateString(isEs ? 'es-ES' : 'en-GB');
+      doc.fontSize(10).text(`${isEs ? 'Fecha' : 'Date'}: ${dateStr}`);
+      doc.text(`${isEs ? 'Propietario' : 'Owner'}: ${owner.firstName} ${owner.lastName}`);
+      doc.text(`${isEs ? 'Unidad' : 'Unit'}: ${payment.invoiceItem.unit.label}`);
+      doc.moveDown(0.5);
+      doc.text(`${isEs ? 'Concepto' : 'Concept'}: ${invoice.concept}`);
+      doc.text(`${isEs ? 'Importe pagado' : 'Amount paid'}: ${Number(payment.amount).toFixed(2)} €`);
+      doc.text(`${isEs ? 'Método' : 'Method'}: ${payment.method ?? (isEs ? 'Transferencia' : 'Transfer')}`);
+      doc.moveDown(1);
+      doc.fontSize(8).fillColor('#999999').text(`ID: ${payment.id}`);
+
+      doc.end();
+    });
+
+    const pdf = Buffer.concat(chunks);
+    const subject = isEs
+      ? `Recibo de pago — ${invoice.concept}`
+      : `Payment receipt — ${invoice.concept}`;
+    const text = isEs
+      ? `Hola ${owner.firstName},\n\nAdjunto encontrarás el recibo por el pago de ${Number(payment.amount).toFixed(2)} € correspondiente a "${invoice.concept}".\n\nComugest`
+      : `Hi ${owner.firstName},\n\nPlease find attached your receipt for the payment of €${Number(payment.amount).toFixed(2)} for "${invoice.concept}".\n\nComugest`;
+
+    // The current email provider does not support attachments.
+    // Log the receipt details so the admin knows it was generated.
+    console.info('[receipt] PDF receipt generated for payment', payment.id, '→', owner.email, subject);
+    console.info('[receipt] PDF size:', pdf.length, 'bytes');
+    console.info('[receipt] body:', text);
+  } catch (err) {
+    console.error('[receipt] failed to send receipt:', err);
+  }
 }
 
 export async function deletePayment(userId: string, userRole: UserRole, paymentId: string) {
@@ -517,6 +594,39 @@ export async function createBulkInvoice(
   })();
 
   return invoice;
+}
+
+export async function getUnitDelinquencyHistory(actorId: string, actorRole: UserRole, communityId: string, unitId: string) {
+  await assertCommunityAccess(actorId, actorRole, communityId);
+
+  const items = await prisma.invoiceItem.findMany({
+    where: { unitId, invoice: { communityId } },
+    include: {
+      invoice: { select: { concept: true, issueDate: true, dueDate: true } },
+      payments: { select: { amount: true, paidAt: true } },
+    },
+    orderBy: { invoice: { dueDate: 'desc' } },
+  });
+
+  const now = new Date();
+  return items.map(item => {
+    const totalPaid = item.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const totalAmount = Number(item.amount);
+    const pending = totalAmount - totalPaid;
+    const dueDate = new Date(item.invoice.dueDate);
+    const daysOverdue = pending > 0 && dueDate < now ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000) : 0;
+    return {
+      invoiceItemId: item.id,
+      concept: item.invoice.concept,
+      issueDate: item.invoice.issueDate,
+      dueDate: item.invoice.dueDate,
+      amount: totalAmount,
+      paid: totalPaid,
+      pending,
+      daysOverdue,
+      status: pending <= 0 ? 'PAID' : dueDate < now ? 'OVERDUE' : 'PENDING',
+    };
+  });
 }
 
 export async function listOverdueByOwner(userId: string, userRole: UserRole, communityId: string) {

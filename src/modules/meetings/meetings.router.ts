@@ -23,6 +23,8 @@ meetingsRouter.patch('/:id/minutes/publish', requireRole('ADMIN_FINCAS', 'SUPPOR
 meetingsRouter.post('/:id/minutes/sign', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.signMinutes));
 // GET /api/v1/meetings/:id/minutes/pdf — export minutes as PDF
 meetingsRouter.get('/:id/minutes/pdf', authenticate, asyncHandler(controller.exportMinutesPdf));
+// GET /api/v1/meetings/:id/convocatoria — export meeting notice as PDF
+meetingsRouter.get('/:id/convocatoria', authenticate, requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.exportConvocatoria));
 
 // QR check-in
 meetingsRouter.post('/:id/qr-token', requireRole('ADMIN_FINCAS', 'SUPPORT'), asyncHandler(controller.generateQr));

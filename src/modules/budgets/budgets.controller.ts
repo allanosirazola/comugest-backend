@@ -21,6 +21,14 @@ export async function getSummary(req: Request, res: Response): Promise<void> {
   res.json(summary);
 }
 
+export async function getComparison(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { communityId } = z.object({ communityId: z.string().cuid() }).parse(req.params);
+  const { year } = z.object({ year: z.coerce.number().int().min(2000).max(2100) }).parse(req.query);
+  const comparison = await service.getBudgetVsActual(user.id, user.role, communityId, year);
+  res.json(comparison);
+}
+
 export async function upsert(req: Request, res: Response): Promise<void> {
   const user = requireUser(req);
   const { communityId, year } = communityYearParams.parse(req.params);

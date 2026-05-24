@@ -116,6 +116,15 @@ export async function exportPdf(req: Request, res: Response): Promise<void> {
   res.send(buffer);
 }
 
+// ─── Delinquency History ─────────────────────────────────────
+
+export async function unitDelinquencyHistory(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { communityId, unitId } = z.object({ communityId: z.string().cuid(), unitId: z.string().cuid() }).parse(req.params);
+  const history = await service.getUnitDelinquencyHistory(user.id, user.role, communityId, unitId);
+  res.json({ history });
+}
+
 // ─── Bulk Invoice ────────────────────────────────────────────
 
 export async function createBulk(req: Request, res: Response): Promise<void> {

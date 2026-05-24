@@ -84,6 +84,8 @@ model User {
   pushSubscriptions        PushSubscription[]
   notifications            Notification[]
   waitlistEntries          ReservationWaitlist[] @relation("WaitlistUser")
+  authoredNotes            UnitNote[]            @relation("NoteAuthor")
+  incidents                IncidentLog[]         @relation("IncidentReporter")
 
   @@index([email])
   @@index([role])
@@ -151,6 +153,7 @@ model Community {
   documents         Document[]
   suppliers         Supplier[]
   bankAccounts      BankAccount[]
+  incidentLog       IncidentLog[]
 
   @@index([name])
 }
@@ -193,6 +196,7 @@ model Unit {
   invoiceItems  InvoiceItem[]
   procedures    Procedure[]
   meterReadings MeterReading[]
+  notes         UnitNote[]
 
   @@unique([communityId, label])
   @@index([communityId])
@@ -901,6 +905,43 @@ model Supplier {
   expenses    Expense[] @relation("ExpenseSupplier")
 
   @@index([communityId])
+}
+
+// ─── Libro de Incidencias ─────────────────────────────────────
+
+model IncidentLog {
+  id           String    @id @default(cuid())
+  communityId  String
+  community    Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  number       Int       // correlative number, unique per community
+  title        String
+  description  String
+  category     String    @default("GENERAL") // GENERAL | STRUCTURAL | ELECTRICAL | PLUMBING | LIFT | FIRE | OTHER
+  reportedById String
+  reportedBy   User      @relation("IncidentReporter", fields: [reportedById], references: [id])
+  status       String    @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED
+  resolvedAt   DateTime?
+  resolution   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([communityId, number])
+  @@index([communityId, status])
+}
+
+// ─── Private Unit Notes ───────────────────────────────────────
+
+model UnitNote {
+  id          String   @id @default(cuid())
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User     @relation("NoteAuthor", fields: [authorId], references: [id])
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([unitId])
 }
 
 // ─── Reservation Waitlist ─────────────────────────────────────

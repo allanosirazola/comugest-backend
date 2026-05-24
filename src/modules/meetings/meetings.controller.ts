@@ -102,3 +102,12 @@ export async function exportMinutesPdf(req: Request, res: Response): Promise<voi
   res.setHeader('Content-Disposition', `attachment; filename="acta-${id.slice(0, 8)}.pdf"`);
   res.send(pdf);
 }
+
+export async function exportConvocatoria(req: Request, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthorizedError();
+  const id = z.string().cuid().parse(req.params.id);
+  const pdf = await service.exportConvocatoriaPdf(req.user.id, req.user.role, id);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="convocatoria-${id.slice(0, 8)}.pdf"`);
+  res.send(pdf);
+}

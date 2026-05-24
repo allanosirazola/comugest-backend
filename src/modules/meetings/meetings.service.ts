@@ -321,6 +321,73 @@ export async function exportMinutesPdf(actorId: string, actorRole: UserRole, mee
   });
 }
 
+export async function exportConvocatoriaPdf(actorId: string, actorRole: UserRole, meetingId: string): Promise<Buffer> {
+  const meeting = await prisma.meeting.findUniqueOrThrow({
+    where: { id: meetingId },
+    include: {
+      community: { include: { units: { include: { ownerships: { where: { endDate: null }, include: { owner: { select: { firstName: true, lastName: true } } } } } } } },
+    },
+  });
+  await assertCommunityAccess(actorId, actorRole, meeting.communityId);
+
+  const PDFDocument = (await import('pdfkit')).default;
+  const doc = new PDFDocument({ margin: 60, size: 'A4' });
+  const chunks: Buffer[] = [];
+  doc.on('data', (c: Buffer) => chunks.push(c));
+
+  return new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const locale = 'es-ES';
+    const dateStr = new Date(meeting.scheduledAt).toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = new Date(meeting.scheduledAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+
+    doc.fontSize(14).font('Helvetica-Bold').text('CONVOCATORIA DE JUNTA DE PROPIETARIOS', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica-Bold').text(meeting.community.name, { align: 'center' });
+    doc.moveDown(1.5);
+
+    doc.fontSize(11).font('Helvetica')
+      .text(`Por medio de la presente, se convoca a todos los propietarios de la Comunidad de Propietarios ${meeting.community.name} a la celebración de la:`)
+      .moveDown(0.5)
+      .font('Helvetica-Bold').text(`JUNTA ${meeting.title.toUpperCase()}`, { align: 'center' })
+      .moveDown(0.5)
+      .font('Helvetica')
+      .text(`Fecha: ${dateStr}`)
+      .text(`Hora: ${timeStr}`)
+      .text(`Lugar: ${meeting.location ?? 'Por determinar'}`)
+      .moveDown(1);
+
+    if (meeting.agenda) {
+      doc.font('Helvetica-Bold').text('ORDEN DEL DÍA:').moveDown(0.3);
+      doc.font('Helvetica').text(meeting.agenda).moveDown(1);
+    }
+
+    doc.font('Helvetica')
+      .text('Y para que conste a los efectos oportunos, se emite la presente convocatoria.')
+      .moveDown(1)
+      .text(`Emitida el ${new Date().toLocaleDateString(locale)}`)
+      .moveDown(2);
+
+    // Attendance list
+    const owners = meeting.community.units
+      .flatMap(u => u.ownerships.map(o => ({ unit: u.label, name: `${o.owner.firstName} ${o.owner.lastName}` })));
+
+    if (owners.length > 0) {
+      doc.addPage();
+      doc.fontSize(12).font('Helvetica-Bold').text('LISTA DE PROPIETARIOS', { align: 'center' });
+      doc.moveDown(1);
+      owners.forEach(({ unit, name }) => {
+        doc.fontSize(10).font('Helvetica').text(`${unit} — ${name}`);
+        doc.moveDown(0.3);
+      });
+    }
+
+    doc.end();
+  });
+}
+
 // ─── In-memory QR token store (resets on restart, fine for meeting use) ──────
 
 const qrTokens = new Map<string, { meetingId: string; expiresAt: number }>();

@@ -1,0 +1,12 @@
+CREATE TABLE "UnitNote" (
+  "id" TEXT NOT NULL,
+  "unitId" TEXT NOT NULL,
+  "authorId" TEXT NOT NULL,
+  "content" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "UnitNote_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX "UnitNote_unitId_idx" ON "UnitNote"("unitId");
+ALTER TABLE "UnitNote" ADD CONSTRAINT "UnitNote_unitId_fkey" FOREIGN KEY ("unitId") REFERENCES "Unit"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "UnitNote" ADD CONSTRAINT "UnitNote_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
