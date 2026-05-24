@@ -10,3 +10,5 @@ incidentsRouter.use(requireRole('ADMIN_FINCAS', 'SUPPORT'));
 incidentsRouter.get('/', asyncHandler(controller.listIncidents));
 incidentsRouter.post('/', asyncHandler(controller.createIncident));
 incidentsRouter.patch('/:incidentId/status', asyncHandler(controller.updateIncidentStatus));
+incidentsRouter.post('/:incidentId/photos', asyncHandler(controller.addPhoto));
+incidentsRouter.delete('/:incidentId/photos/:photoIndex', asyncHandler(controller.removePhoto));

@@ -38,6 +38,7 @@ import importRouter from './modules/import/import.router';
 import bankingRouter from './modules/banking/banking.router';
 import unitNotesRouter from './modules/units/unit-notes.router';
 import { incidentsRouter } from './modules/incidents/incidents.router';
+import { templatesRouter } from './modules/templates/templates.router';
 
 export function createApp(): Express {
   const app = express();
@@ -62,8 +63,8 @@ export function createApp(): Express {
   // Raw body for Stripe webhook — must be before express.json()
   app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
 
-  app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -121,6 +122,7 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/banking', bankingRouter);
   app.use('/api/v1/units/:unitId/notes', unitNotesRouter);
   app.use('/api/v1/communities/:communityId/incidents', incidentsRouter);
+  app.use('/api/v1/communities/:communityId/templates', templatesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
