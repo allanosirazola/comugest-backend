@@ -361,6 +361,7 @@ model Announcement {
   body        String
   pinned      Boolean   @default(false)
   publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

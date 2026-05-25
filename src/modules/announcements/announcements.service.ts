@@ -32,6 +32,7 @@ export async function createAnnouncement(
       title: input.title,
       body: input.body,
       pinned: input.pinned,
+      expiresAt: input.expiresAt ?? null,
     },
     include: { author: { select: { firstName: true, lastName: true } } },
   });
@@ -124,7 +125,10 @@ export async function listMyAnnouncements(userId: string) {
   if (communityIds.length === 0) return [];
 
   return prisma.announcement.findMany({
-    where: { communityId: { in: communityIds } },
+    where: {
+      communityId: { in: communityIds },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
     orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }],
     include: {
       author: { select: { firstName: true, lastName: true } },
