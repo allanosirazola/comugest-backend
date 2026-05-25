@@ -11,12 +11,14 @@ process.env.JWT_ACCESS_SECRET = 'e2e-test-access-secret-at-least-32-chars-long!!
 process.env.JWT_REFRESH_SECRET = 'e2e-test-refresh-secret-at-least-32-chars-long!!';
 process.env.JWT_ACCESS_EXPIRES_IN = '15m';
 process.env.JWT_REFRESH_EXPIRES_IN = '30d';
-process.env.BCRYPT_ROUNDS = '4'; // Minimum for speed in tests
+process.env.BCRYPT_ROUNDS = '10'; // Minimum valid value for tests (schema requires min 10)
 process.env.EMAIL_PROVIDER = 'console'; // Don't send real emails
 process.env.STRIPE_SECRET_KEY = '';
 process.env.VAPID_PUBLIC_KEY = '';
 process.env.VAPID_PRIVATE_KEY = '';
 process.env.PORT = '4001'; // Different from dev server
+process.env.RATE_LIMIT_MAX = '10000'; // Disable effective rate limiting during tests
+process.env.RATE_LIMIT_WINDOW_MS = '900000'; // 15 minutes (default)
 
 import { beforeAll, afterAll } from 'vitest';
 import { prisma } from '../../config/prisma';
