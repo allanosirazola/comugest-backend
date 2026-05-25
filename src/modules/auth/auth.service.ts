@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { hashPassword, verifyPassword } from '../../utils/password';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken, signPreAuthToken, verifyPreAuthToken } from '../../utils/jwt';
 import { generateVerificationToken, hashToken } from '../../utils/tokens';
 import { ConflictError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { sendEmail } from '../email/email.service';
@@ -9,6 +9,13 @@ import { buildFrontendUrl } from '../email/templates';
 import type { RegisterInput, LoginInput } from './auth.schemas';
 import type { User, UserRole } from '@prisma/client';
 import crypto from 'crypto';
+import { generateSecret, generateURI, verifySync, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+import QRCode from 'qrcode';
+
+const totpPlugins = {
+  crypto: new NobleCryptoPlugin(),
+  encoding: new ScureBase32Plugin(),
+};
 
 const CURRENT_GDPR_VERSION = '2025-01-01';
 
@@ -166,12 +173,30 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     throw new ForbiddenError('Tu cuenta aún no ha sido activada. Revisa tu email de invitación');
   }
 
+  if (user.totpEnabled) {
+    const preAuthToken = signPreAuthToken(user.id);
+    return { requiresTwoFactor: true, preAuthToken } as unknown as AuthResponse;
+  }
+
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
   });
 
   return issueTokens(user);
+}
+
+export async function completeTwoFactorLogin(preAuthToken: string, totpCode: string): Promise<AuthResponse> {
+  const payload = verifyPreAuthToken(preAuthToken);
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: payload.sub },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, totpSecret: true, totpEnabled: true, status: true, locale: true },
+  });
+  if (!user.totpEnabled || !user.totpSecret) throw new UnauthorizedError('2FA no está activado');
+  const result = verifySync({ ...totpPlugins, secret: user.totpSecret, token: totpCode, strategy: 'totp' });
+  if (!result.valid) throw new UnauthorizedError('Código 2FA incorrecto');
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  return issueTokens(user as Parameters<typeof issueTokens>[0]);
 }
 
 export async function verifyEmail(rawToken: string): Promise<AuthResponse> {
@@ -326,4 +351,35 @@ export async function resetPassword(rawToken: string, newPassword: string): Prom
       data: { revokedAt: new Date() },
     });
   });
+}
+
+export async function setup2FA(userId: string) {
+  const secret = generateSecret(totpPlugins);
+  await prisma.user.update({ where: { id: userId }, data: { totpSecret: secret, totpEnabled: false } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
+  const otpauth = generateURI({ ...totpPlugins, label: user.email, issuer: 'Comugest', secret, strategy: 'totp' });
+  const qrDataUrl = await QRCode.toDataURL(otpauth);
+  return { secret, qrDataUrl };
+}
+
+export async function verify2FA(userId: string, token: string) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { totpSecret: true } });
+  if (!user.totpSecret) throw new Error('2FA not set up');
+  const result = verifySync({ ...totpPlugins, secret: user.totpSecret, token, strategy: 'totp' });
+  if (!result.valid) throw new Error('Invalid code');
+  await prisma.user.update({ where: { id: userId }, data: { totpEnabled: true } });
+  return { enabled: true };
+}
+
+export async function disable2FA(userId: string, token: string) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { totpSecret: true, totpEnabled: true } });
+  if (!user.totpSecret || !user.totpEnabled) throw new Error('2FA is not enabled');
+  const result = verifySync({ ...totpPlugins, secret: user.totpSecret, token, strategy: 'totp' });
+  if (!result.valid) throw new Error('Invalid code');
+  await prisma.user.update({ where: { id: userId }, data: { totpEnabled: false, totpSecret: null } });
+}
+
+export async function check2FARequired(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { totpEnabled: true } });
+  return user.totpEnabled;
 }

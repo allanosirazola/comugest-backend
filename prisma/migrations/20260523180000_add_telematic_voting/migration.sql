@@ -1,0 +1,5 @@
+ALTER TABLE "Poll" ADD COLUMN "votingDeadline" TIMESTAMP(3);
+ALTER TABLE "Poll" ADD COLUMN "requiresAttendance" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Poll" ADD COLUMN "quorumReached" BOOLEAN;
+
+ALTER TABLE "Vote" ADD COLUMN "isTelematic" BOOLEAN NOT NULL DEFAULT true;

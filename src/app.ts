@@ -17,8 +17,28 @@ import proceduresRoutes, { meProceduresRouter, communityProceduresRouter } from 
 import { communityBudgetsRouter } from './modules/budgets/budgets.router';
 import { adminRouter } from './modules/admin/admin.router';
 import { auditRouter } from './modules/audit/audit.router';
-import { communityAreasRouter, areaActionsRouter } from './modules/common-areas/common-areas.router';
-import { communityMeetingsRouter, meetingsRouter } from './modules/meetings/meetings.router';
+import { communityAreasRouter, areaActionsRouter, meReservationsRouter } from './modules/common-areas/common-areas.router';
+import { communityMeetingsRouter, meetingsRouter, meMeetingsRouter } from './modules/meetings/meetings.router';
+import { meProfileRouter } from './modules/me/me.router';
+import { communityRecurringRouter } from './modules/recurring-invoices/recurring-invoices.router';
+import { communityDocumentsRouter } from './modules/documents/documents.router';
+import { communityReportsRouter } from './modules/reports/reports.router';
+import { meDocumentsRouter } from './modules/me/me.router';
+import { communityCoAdminsRouter } from './modules/co-admins/co-admins.router';
+import { meetingPollsRouter } from './modules/polls/polls.router';
+import { communityMeterReadingsRouter } from './modules/meter-readings/meter-readings.router';
+import { communityCalendarRouter, meCalendarRouter } from './modules/calendar/calendar.router';
+import { communitySupplierRouter } from './modules/suppliers/suppliers.router';
+import { billingRouter } from './modules/billing/billing.router';
+import { pushRouter } from './modules/push/push.router';
+import notificationsRouter from './modules/notifications/notifications.router';
+import { startScheduler } from './modules/scheduler/scheduler';
+import { meWaitlistRouter, areaWaitlistRouter } from './modules/reservations/waitlist.router';
+import importRouter from './modules/import/import.router';
+import bankingRouter from './modules/banking/banking.router';
+import unitNotesRouter from './modules/units/unit-notes.router';
+import { incidentsRouter } from './modules/incidents/incidents.router';
+import { templatesRouter } from './modules/templates/templates.router';
 
 export function createApp(): Express {
   const app = express();
@@ -40,8 +60,11 @@ export function createApp(): Express {
     })
   );
 
-  app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  // Raw body for Stripe webhook — must be before express.json()
+  app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -58,6 +81,12 @@ export function createApp(): Express {
   app.use('/api/v1/communities/:communityId/expenses', communityExpensesRouter);
   app.use('/api/v1/communities/:communityId/procedures', communityProceduresRouter);
   app.use('/api/v1/communities/:communityId/budgets', communityBudgetsRouter);
+  app.use('/api/v1/communities/:communityId/recurring', communityRecurringRouter);
+  app.use('/api/v1/communities/:communityId/documents', communityDocumentsRouter);
+  app.use('/api/v1/communities/:communityId/reports', communityReportsRouter);
+  app.use('/api/v1/communities/:communityId/co-admins', communityCoAdminsRouter);
+  app.use('/api/v1/communities/:communityId/meter-readings', communityMeterReadingsRouter);
+  app.use('/api/v1/communities/:communityId/suppliers', communitySupplierRouter);
   app.use('/api/v1/announcements', announcementsRoutes);
   app.use('/api/v1/expenses', expensesRoutes);
   app.use('/api/v1/messages', messagesRoutes);
@@ -70,6 +99,7 @@ export function createApp(): Express {
   app.use('/api/v1/areas', areaActionsRouter);
   app.use('/api/v1/communities/:communityId/meetings', communityMeetingsRouter);
   app.use('/api/v1/meetings', meetingsRouter);
+  app.use('/api/v1/meetings/:meetingId/polls', meetingPollsRouter);
   // Vistas del propio vecino bajo /api/v1/me
   app.use('/api/v1/me', meInvoicesRouter);
   app.use('/api/v1/me', meAnnouncementsRouter);
@@ -77,9 +107,27 @@ export function createApp(): Express {
   app.use('/api/v1/me', meExpensesRouter);
   app.use('/api/v1/me', meTicketsRouter);
   app.use('/api/v1/me', meProceduresRouter);
+  app.use('/api/v1/me', meProfileRouter);
+  app.use('/api/v1/me', meReservationsRouter);
+  app.use('/api/v1/me', meMeetingsRouter);
+  app.use('/api/v1/me', meDocumentsRouter);
+  app.use('/api/v1/communities/:communityId/calendar', communityCalendarRouter);
+  app.use('/api/v1/me', meCalendarRouter);
+  app.use('/api/v1/billing', billingRouter);
+  app.use('/api/v1/push', pushRouter);
+  app.use('/api/v1/me/notifications', notificationsRouter);
+  app.use('/api/v1/me', meWaitlistRouter);
+  app.use('/api/v1/communities/:communityId/areas/:areaId/waitlist', areaWaitlistRouter);
+  app.use('/api/v1/communities/:communityId/import/csv', importRouter);
+  app.use('/api/v1/communities/:communityId/banking', bankingRouter);
+  app.use('/api/v1/units/:unitId/notes', unitNotesRouter);
+  app.use('/api/v1/communities/:communityId/incidents', incidentsRouter);
+  app.use('/api/v1/communities/:communityId/templates', templatesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
+
+  startScheduler();
 
   return app;
 }

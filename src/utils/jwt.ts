@@ -41,3 +41,22 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
     throw new UnauthorizedError('Refresh token inválido o expirado');
   }
 }
+
+export interface PreAuthTokenPayload {
+  sub: string; // userId
+  type: 'pre_auth';
+}
+
+export function signPreAuthToken(userId: string): string {
+  return jwt.sign({ sub: userId, type: 'pre_auth' } satisfies PreAuthTokenPayload, env.JWT_ACCESS_SECRET, { expiresIn: '5m' });
+}
+
+export function verifyPreAuthToken(token: string): PreAuthTokenPayload {
+  try {
+    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as PreAuthTokenPayload;
+    if (payload.type !== 'pre_auth') throw new Error();
+    return payload;
+  } catch {
+    throw new UnauthorizedError('Token de pre-autenticación inválido o expirado');
+  }
+}

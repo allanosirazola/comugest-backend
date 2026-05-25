@@ -200,6 +200,26 @@ export async function createReservation(
   return reservation;
 }
 
+export async function listMyReservations(userId: string) {
+  return prisma.reservation.findMany({
+    where: {
+      userId,
+      status: 'CONFIRMED',
+    },
+    orderBy: { startAt: 'desc' },
+    include: {
+      area: {
+        select: {
+          id: true,
+          name: true,
+          communityId: true,
+          community: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+}
+
 export async function cancelReservation(
   requesterId: string,
   reservationId: string,

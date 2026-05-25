@@ -8,6 +8,7 @@ import {
   resendVerificationSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  twoFactorLoginSchema,
 } from './auth.schemas';
 import { UnauthorizedError } from '../../utils/errors';
 
@@ -65,4 +66,10 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   const { token, password } = resetPasswordSchema.parse(req.body);
   await authService.resetPassword(token, password);
   res.status(204).send();
+}
+
+export async function twoFactorLogin(req: Request, res: Response): Promise<void> {
+  const { preAuthToken, totpCode } = twoFactorLoginSchema.parse(req.body);
+  const result = await authService.completeTwoFactorLogin(preAuthToken, totpCode);
+  res.json(result);
 }

@@ -7,5 +7,6 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 export const communityBudgetsRouter: Router = Router({ mergeParams: true });
 communityBudgetsRouter.use(authenticate);
 communityBudgetsRouter.use(requireRole('ADMIN_FINCAS', 'SUPPORT'));
+communityBudgetsRouter.get('/comparison', asyncHandler(controller.getComparison));
 communityBudgetsRouter.get('/:year', asyncHandler(controller.getSummary));
 communityBudgetsRouter.put('/:year', asyncHandler(controller.upsert));

@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import * as service from './units.service';
 import {
   createUnitSchema,
@@ -41,4 +42,11 @@ export async function remove(req: Request, res: Response): Promise<void> {
   const { id } = unitIdParamSchema.parse(req.params);
   await service.deleteUnit(user.id, user.role, id);
   res.status(204).send();
+}
+
+export async function ownershipHistory(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const { communityId, unitId } = z.object({ communityId: z.string().cuid(), unitId: z.string().cuid() }).parse(req.params);
+  const ownerships = await service.getOwnershipHistory(user.id, user.role, communityId, unitId);
+  res.json({ ownerships });
 }

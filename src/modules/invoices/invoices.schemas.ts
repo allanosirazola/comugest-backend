@@ -59,6 +59,15 @@ export type ListInvoicesQuery = z.infer<typeof listInvoicesQuerySchema>;
 
 // ─── SEPA export ────────────────────────────────────────────
 
+export const bulkInvoiceSchema = z.object({
+  concept: z.string().min(1).max(200),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  distributionMode: z.enum(['EQUAL']),
+  perUnitAmount: z.number().positive(),
+});
+export type BulkInvoiceInput = z.infer<typeof bulkInvoiceSchema>;
+
 export const sepaExportSchema = z.object({
   creditorName: z.string().min(1).max(140),
   creditorIban: z.string().min(15).max(34).regex(/^[A-Z]{2}[0-9A-Z]+$/, 'IBAN inválido'),

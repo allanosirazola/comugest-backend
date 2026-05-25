@@ -1,0 +1,3 @@
+-- AlterEnum: add new audit actions
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'CO_ADMIN_ADDED';
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'CO_ADMIN_REMOVED';

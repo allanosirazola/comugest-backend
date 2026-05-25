@@ -3,6 +3,11 @@ import { env } from '../../config/env';
 // ─── Definición de tipos por plantilla ──────────────────────
 
 export interface TemplateVars {
+  overdueReminder: {
+    firstName: string;
+    count: number;
+    total: string;
+  };
   emailVerification: {
     firstName: string;
     verificationUrl: string;
@@ -92,6 +97,26 @@ function escapeHtml(s: string): string {
 // ─── Plantillas ─────────────────────────────────────────────
 
 const templates = {
+  overdueReminder: {
+    es: (v: TemplateVars['overdueReminder']): RenderedEmail => ({
+      subject: 'Tienes facturas vencidas en Comugest',
+      text: `Hola ${v.firstName},\n\nTienes ${v.count} factura(s) vencidas por un total de ${v.total} €. Entra en Comugest para ponerte al día.\n\nComugest`,
+      html: wrapHtml(
+        `<p style="margin:0 0 16px;">Hola <strong>${escapeHtml(v.firstName)}</strong>,</p>
+         <p style="margin:0 0 16px;">Tienes <strong>${v.count}</strong> factura(s) vencidas por un total de <strong>${escapeHtml(v.total)} €</strong>. Entra en Comugest para ponerte al día.</p>`,
+        'Comugest'
+      ),
+    }),
+    en: (v: TemplateVars['overdueReminder']): RenderedEmail => ({
+      subject: 'You have overdue invoices in Comugest',
+      text: `Hi ${v.firstName},\n\nYou have ${v.count} overdue invoice(s) totalling €${v.total}. Log in to Comugest to view them.\n\nComugest`,
+      html: wrapHtml(
+        `<p style="margin:0 0 16px;">Hi <strong>${escapeHtml(v.firstName)}</strong>,</p>
+         <p style="margin:0 0 16px;">You have <strong>${v.count}</strong> overdue invoice(s) totalling <strong>€${escapeHtml(v.total)}</strong>. Log in to Comugest to view them.</p>`,
+        'Comugest'
+      ),
+    }),
+  },
   emailVerification: {
     es: (v: TemplateVars['emailVerification']): RenderedEmail => ({
       subject: 'Verifica tu correo en Comugest',

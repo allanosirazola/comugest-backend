@@ -40,3 +40,8 @@ areaActionsRouter.delete(
   '/reservations/:id',
   asyncHandler(controller.cancelReservation)
 );
+
+// ─── Vecino: /me/reservations ────────────────────────────────
+export const meReservationsRouter: Router = Router();
+meReservationsRouter.use(authenticate);
+meReservationsRouter.get('/reservations', asyncHandler(controller.listMyReservations));

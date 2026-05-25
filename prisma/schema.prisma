@@ -43,6 +43,12 @@ model User {
   invitedById     String?
   invitedBy       User?      @relation("UserInvitations", fields: [invitedById], references: [id])
   invitedUsers    User[]     @relation("UserInvitations")
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  planStatus           String   @default("FREE")
+  planCurrentPeriodEnd DateTime?
+  totpSecret           String?
+  totpEnabled          Boolean  @default(false)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -67,7 +73,20 @@ model User {
   reservations        Reservation[]     @relation("ReservationUser")
   cancelledReservations Reservation[]   @relation("ReservationCanceller")
   organizedMeetings   Meeting[]         @relation("MeetingOrganizer")
+  signedMinutes       Meeting[]         @relation("MinutesSigner")
   meetingAttendances  MeetingAttendee[]
+  createdRecurringInvoices RecurringInvoice[] @relation("RecurringInvoiceCreator")
+  uploadedDocuments        Document[]         @relation("DocumentUploader")
+  createdPolls             Poll[]             @relation("PollCreator")
+  votes                    Vote[]             @relation("VoteCaster")
+  recordedReadings         MeterReading[]     @relation("MeterReadingRecorder")
+  createdSuppliers         Supplier[]         @relation("SupplierCreator")
+  pushSubscriptions        PushSubscription[]
+  notifications            Notification[]
+  waitlistEntries          ReservationWaitlist[] @relation("WaitlistUser")
+  authoredNotes            UnitNote[]            @relation("NoteAuthor")
+  incidents                IncidentLog[]         @relation("IncidentReporter")
+  messageTemplates         MessageTemplate[]     @relation("TemplateCreator")
 
   @@index([email])
   @@index([role])
@@ -131,6 +150,12 @@ model Community {
   budgets      Budget[]
   commonAreas  CommonArea[]
   meetings     Meeting[]
+  recurringInvoices RecurringInvoice[]
+  documents         Document[]
+  suppliers         Supplier[]
+  bankAccounts      BankAccount[]
+  incidentLog       IncidentLog[]
+  messageTemplates  MessageTemplate[]
 
   @@index([name])
 }
@@ -168,10 +193,12 @@ model Unit {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  ownerships   Ownership[]
-  occupancies  Occupancy[]
-  invoiceItems InvoiceItem[]
-  procedures   Procedure[]
+  ownerships    Ownership[]
+  occupancies   Occupancy[]
+  invoiceItems  InvoiceItem[]
+  procedures    Procedure[]
+  meterReadings MeterReading[]
+  notes         UnitNote[]
 
   @@unique([communityId, label])
   @@index([communityId])
@@ -273,6 +300,8 @@ model Invoice {
   issuedById    String
   issuedBy      User        @relation("InvoiceIssuer", fields: [issuedById], references: [id], onDelete: Restrict)
   cancelledAt   DateTime?
+  recurringSourceId String?
+  recurringSource   RecurringInvoice? @relation("RecurringSource", fields: [recurringSourceId], references: [id], onDelete: SetNull)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -400,7 +429,9 @@ model Expense {
   description   String?
   amount        Decimal         @db.Decimal(12, 2)
   expenseDate   DateTime
-  supplier      String?         // proveedor
+  supplier      String?         // proveedor (texto libre, legado)
+  supplierId    String?
+  supplierRel   Supplier?       @relation("ExpenseSupplier", fields: [supplierId], references: [id])
   attachmentUrl String?         // factura del proveedor
   recordedById  String
   recordedBy    User            @relation("ExpenseRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
@@ -431,6 +462,36 @@ model BudgetLine {
   budget   Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   category String  // matches ExpenseCategory enum values
   amount   Decimal @db.Decimal(12, 2)
+}
+
+// ─── Cuotas ordinarias recurrentes ──────────────────────────
+
+enum RecurringFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model RecurringInvoice {
+  id            String              @id @default(cuid())
+  communityId   String
+  community     Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  concept       String
+  description   String?
+  frequency     RecurringFrequency
+  amount        Decimal             @db.Decimal(12, 2)
+  dayOfMonth    Int                 @default(1)   // day of month to issue (1-28)
+  nextBillingAt DateTime
+  active        Boolean             @default(true)
+  createdById   String
+  createdBy     User                @relation("RecurringInvoiceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  generatedInvoices Invoice[]       @relation("RecurringSource")
+
+  @@index([communityId])
+  @@index([nextBillingAt, active])
 }
 
 // ─── Tickets de soporte (sistema interno) ───────────────────
@@ -572,6 +633,7 @@ model CommonArea {
   updatedAt     DateTime  @updatedAt
 
   reservations Reservation[]
+  waitlist     ReservationWaitlist[]
 
   @@index([communityId])
 }
@@ -623,7 +685,13 @@ model Meeting {
   scheduledAt     DateTime
   location        String?
   agenda          String?
-  minutes         String?
+  minutes          String?
+  minutesUpdatedAt DateTime?
+  minutesPublished     Boolean   @default(false)
+  minutesSignedAt      DateTime?
+  minutesSignedById    String?
+  minutesSignedBy      User?     @relation("MinutesSigner", fields: [minutesSignedById], references: [id])
+  minutesSignatureHash String?
   minutesUrl      String?
   organizedById   String
   organizedBy     User          @relation("MeetingOrganizer", fields: [organizedById], references: [id], onDelete: Restrict)
@@ -631,6 +699,7 @@ model Meeting {
   updatedAt       DateTime      @updatedAt
 
   attendees MeetingAttendee[]
+  polls     Poll[]
 
   @@index([communityId, scheduledAt])
 }
@@ -684,6 +753,23 @@ enum AuditAction {
   MEETING_CREATED
   MEETING_UPDATED
   MEETING_CANCELLED
+  RECURRING_INVOICE_CREATED
+  RECURRING_INVOICE_TRIGGERED
+  DOCUMENT_CREATED
+  DOCUMENT_DELETED
+  SUPPLIER_CREATED
+  SUPPLIER_UPDATED
+  SUPPLIER_DELETED
+  POLL_CREATED
+  POLL_CLOSED
+  VOTE_CAST
+  CO_ADMIN_ADDED
+  CO_ADMIN_REMOVED
+  METER_READING_ADDED
+  MINUTES_SAVED
+  MINUTES_PUBLISHED
+  SUBSCRIPTION_ACTIVATED
+  SUBSCRIPTION_CANCELLED
 }
 
 model AuditLog {
@@ -700,4 +786,260 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([communityId, createdAt])
   @@index([action, createdAt])
+}
+
+// ─── Archivo de documentos ───────────────────────────────────
+
+enum DocumentCategory {
+  ACTA
+  REGLAMENTO
+  PRESUPUESTO
+  CONTRATO
+  CERTIFICADO
+  OTRO
+}
+
+model Document {
+  id                 String           @id @default(cuid())
+  communityId        String
+  community          Community        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  category           DocumentCategory @default(OTRO)
+  url                String
+  publicForResidents Boolean          @default(true)
+  uploadedById       String
+  uploadedBy         User             @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([communityId])
+  @@index([communityId, category])
+}
+
+// ─── Votaciones en junta ─────────────────────────────────────
+
+enum VoteOption {
+  FAVOR
+  CONTRA
+  ABSTENCION
+}
+
+enum PollStatus {
+  OPEN
+  CLOSED
+}
+
+model Poll {
+  id                 String     @id @default(cuid())
+  meetingId          String
+  meeting            Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  question           String
+  description        String?
+  status             PollStatus @default(OPEN)
+  votingDeadline     DateTime?
+  requiresAttendance Boolean    @default(false)
+  quorumReached      Boolean?
+  createdById        String
+  createdBy          User       @relation("PollCreator", fields: [createdById], references: [id])
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  votes              Vote[]
+
+  @@index([meetingId])
+}
+
+model Vote {
+  id          String     @id @default(cuid())
+  pollId      String
+  poll        Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation("VoteCaster", fields: [userId], references: [id])
+  option      VoteOption
+  isTelematic Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+}
+
+// ─── Lecturas de contadores ──────────────────────────────────
+
+enum MeterType {
+  AGUA
+  LUZ
+  GAS
+  OTRO
+}
+
+model MeterReading {
+  id           String    @id @default(cuid())
+  unitId       String
+  unit         Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  type         MeterType @default(AGUA)
+  readingDate  DateTime
+  value        Decimal   @db.Decimal(12, 3)
+  consumption  Decimal?  @db.Decimal(12, 3)
+  notes        String?
+  recordedById String
+  recordedBy   User      @relation("MeterReadingRecorder", fields: [recordedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@index([unitId, type, readingDate])
+}
+
+// ─── Proveedores ─────────────────────────────────────────────
+
+model Supplier {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  name        String
+  cif         String?
+  email       String?
+  phone       String?
+  address     String?
+  notes       String?
+  createdById String
+  createdBy   User      @relation("SupplierCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expenses    Expense[] @relation("ExpenseSupplier")
+
+  @@index([communityId])
+}
+
+// ─── Libro de Incidencias ─────────────────────────────────────
+
+model IncidentLog {
+  id           String    @id @default(cuid())
+  communityId  String
+  community    Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  number       Int       // correlative number, unique per community
+  title        String
+  description  String
+  category     String    @default("GENERAL") // GENERAL | STRUCTURAL | ELECTRICAL | PLUMBING | LIFT | FIRE | OTHER
+  reportedById String
+  reportedBy   User      @relation("IncidentReporter", fields: [reportedById], references: [id])
+  status       String    @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED
+  resolvedAt   DateTime?
+  resolution   String?
+  photos       String[]  // base64 data URIs or file URL strings
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([communityId, number])
+  @@index([communityId, status])
+}
+
+// ─── Private Unit Notes ───────────────────────────────────────
+
+model UnitNote {
+  id          String   @id @default(cuid())
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User     @relation("NoteAuthor", fields: [authorId], references: [id])
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([unitId])
+}
+
+// ─── Reservation Waitlist ─────────────────────────────────────
+
+model ReservationWaitlist {
+  id         String     @id @default(cuid())
+  areaId     String
+  area       CommonArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User       @relation("WaitlistUser", fields: [userId], references: [id], onDelete: Cascade)
+  startTime  DateTime
+  endTime    DateTime
+  notified   Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+
+  @@unique([areaId, userId, startTime, endTime])
+  @@index([areaId, startTime])
+}
+
+// ─── Web Push Subscriptions ──────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── In-app Notifications ────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  url       String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─── Banking Integration ─────────────────────────────────────
+
+model BankAccount {
+  id              String   @id @default(cuid())
+  communityId     String
+  community       Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  institutionName String
+  iban            String?
+  connectionId    String?  // GoCardless requisition ID
+  status          String   @default("PENDING") // PENDING | ACTIVE | EXPIRED | ERROR
+  accessToken     String?
+  accessExpiry    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  transactions    BankTransaction[]
+
+  @@index([communityId])
+}
+
+model BankTransaction {
+  id              String      @id @default(cuid())
+  bankAccountId   String
+  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  transactionDate DateTime
+  amount          Decimal     @db.Decimal(12, 2)
+  description     String
+  reference       String?
+  matchedItemId   String?     // FK to InvoiceItem if reconciled
+  reconciledAt    DateTime?
+  createdAt       DateTime    @default(now())
+
+  @@index([bankAccountId, transactionDate])
+}
+
+// ─── Plantillas de mensajes/anuncios ─────────────────────────
+
+model MessageTemplate {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  name        String
+  subject     String
+  body        String
+  createdById String
+  createdBy   User      @relation("TemplateCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([communityId])
 }
