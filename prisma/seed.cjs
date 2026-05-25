@@ -678,6 +678,335 @@ async function main() {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // 14. PROCEDURES (Trámites) for Community 1
+  // ─────────────────────────────────────────────────────────────
+  const procedureDefs = [
+    {
+      subject: 'Solicitud de certificado de deudas',
+      description: 'El propietario de 1A solicita un certificado de estar al corriente de pago para notaría.',
+      status: 'COMPLETED',
+      type: 'CERTIFICATE',
+      unitLabel: '1A',
+      requesterId: anaUser.id,
+    },
+    {
+      subject: 'Cambio de propietario — Unidad 3A',
+      description: 'Tramitación del cambio de titularidad por compraventa. Pendiente de recibir documentación notarial.',
+      status: 'IN_PROGRESS',
+      type: 'OTHER',
+      unitLabel: null,
+      requesterId: demoAdmin.id,
+    },
+    {
+      subject: 'Solicitud de obras en elemento común',
+      description: 'El propietario de 2B solicita autorización para instalar aire acondicionado en fachada.',
+      status: 'SUBMITTED',
+      type: 'PERMISSION',
+      unitLabel: '2B',
+      requesterId: joseUser.id,
+    },
+  ];
+
+  for (const def of procedureDefs) {
+    const existing = await prisma.procedure.findFirst({
+      where: { communityId: comm1.id, subject: def.subject },
+    });
+    if (!existing) {
+      await prisma.procedure.create({
+        data: {
+          communityId: comm1.id,
+          requesterId: def.requesterId,
+          type: def.type,
+          status: def.status,
+          subject: def.subject,
+          description: def.description,
+          unitId: def.unitLabel ? comm1Units[def.unitLabel].id : null,
+          handledById: demoAdmin.id,
+        },
+      });
+      console.log(`✅ Trámite creado: ${def.subject}`);
+    } else {
+      console.log(`ℹ️  Trámite ya existe: ${def.subject}`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 15. DOCUMENTS for Community 1
+  // ─────────────────────────────────────────────────────────────
+  const documentDefs = [
+    {
+      name: 'Estatutos de la comunidad',
+      description: 'Estatutos vigentes aprobados en junta',
+      url: 'https://example.com/docs/estatutos.pdf',
+      category: 'REGLAMENTO',
+    },
+    {
+      name: 'Acta Junta General 2025',
+      description: 'Acta de la junta general ordinaria del ejercicio 2025',
+      url: 'https://example.com/docs/acta-2025.pdf',
+      category: 'ACTA',
+    },
+    {
+      name: 'Seguro de comunidad 2026',
+      description: 'Póliza seguro multiriesgo vigente',
+      url: 'https://example.com/docs/seguro-2026.pdf',
+      category: 'CONTRATO',
+    },
+  ];
+
+  for (const def of documentDefs) {
+    const existing = await prisma.document.findFirst({
+      where: { communityId: comm1.id, name: def.name },
+    });
+    if (!existing) {
+      await prisma.document.create({
+        data: {
+          communityId: comm1.id,
+          name: def.name,
+          description: def.description,
+          url: def.url,
+          category: def.category,
+          uploadedById: demoAdmin.id,
+          publicForResidents: true,
+        },
+      });
+      console.log(`✅ Documento creado: ${def.name}`);
+    } else {
+      console.log(`ℹ️  Documento ya existe: ${def.name}`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 16. COMMON AREAS for Community 1
+  // ─────────────────────────────────────────────────────────────
+  const commonAreaDefs = [
+    {
+      name: 'Sala de reuniones',
+      description: 'Sala para reuniones de vecinos y junta',
+      capacity: 20,
+      active: true,
+    },
+    {
+      name: 'Zona de jardín',
+      description: 'Jardín comunitario con zona de descanso',
+      capacity: null,
+      active: false,
+    },
+  ];
+
+  for (const def of commonAreaDefs) {
+    const existing = await prisma.commonArea.findFirst({
+      where: { communityId: comm1.id, name: def.name },
+    });
+    if (!existing) {
+      await prisma.commonArea.create({
+        data: {
+          communityId: comm1.id,
+          name: def.name,
+          description: def.description,
+          capacity: def.capacity,
+          active: def.active,
+        },
+      });
+      console.log(`✅ Zona común creada: ${def.name}`);
+    } else {
+      console.log(`ℹ️  Zona común ya existe: ${def.name}`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 17. RECURRING INVOICE for Community 1
+  // ─────────────────────────────────────────────────────────────
+  const existingRecurring = await prisma.recurringInvoice.findFirst({
+    where: { communityId: comm1.id, concept: 'Cuota ordinaria mensual' },
+  });
+  if (!existingRecurring) {
+    await prisma.recurringInvoice.create({
+      data: {
+        communityId: comm1.id,
+        concept: 'Cuota ordinaria mensual',
+        frequency: 'MONTHLY',
+        amount: 150,
+        dayOfMonth: 1,
+        nextBillingAt: new Date('2026-06-01'),
+        active: true,
+        createdById: demoAdmin.id,
+      },
+    });
+    console.log('✅ Cuota recurrente creada: Cuota ordinaria mensual');
+  } else {
+    console.log('ℹ️  Cuota recurrente ya existe: Cuota ordinaria mensual');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 18. METER READINGS for unit 1A (Ana García)
+  // ─────────────────────────────────────────────────────────────
+  const unit1AForMeters = comm1Units['1A'];
+
+  const meterReadingDefs = [
+    { readingDate: new Date('2026-01-01'), value: 145.3 },
+    { readingDate: new Date('2026-02-01'), value: 162.7 },
+  ];
+
+  for (const def of meterReadingDefs) {
+    const existing = await prisma.meterReading.findFirst({
+      where: { unitId: unit1AForMeters.id, type: 'AGUA', readingDate: def.readingDate },
+    });
+    if (!existing) {
+      await prisma.meterReading.create({
+        data: {
+          unitId: unit1AForMeters.id,
+          type: 'AGUA',
+          readingDate: def.readingDate,
+          value: def.value,
+          recordedById: demoAdmin.id,
+        },
+      });
+      console.log(`✅ Lectura contador creada: ${def.readingDate.toISOString().slice(0, 10)} — ${def.value}`);
+    } else {
+      console.log(`ℹ️  Lectura contador ya existe: ${def.readingDate.toISOString().slice(0, 10)}`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 19. SUPPLIERS for Community 1
+  // ─────────────────────────────────────────────────────────────
+  const supplierDefs = [
+    {
+      name: 'Limpiezas Rápidas S.L.',
+      cif: 'B28111111',
+      phone: '+34 91 000 0001',
+      email: 'info@limpirapidas.es',
+      notes: 'Contacto: Juan García. Categoría: CLEANING',
+    },
+    {
+      name: 'Ascensores Modernos S.A.',
+      cif: 'A28222222',
+      phone: '+34 91 000 0002',
+      email: 'service@ascmodernos.es',
+      notes: 'Contacto: María López. Categoría: LIFT',
+    },
+    {
+      name: 'Seguros Comunidades Plus',
+      cif: 'A28333333',
+      phone: '+34 91 000 0003',
+      email: 'comunidades@segurosplus.es',
+      notes: 'Contacto: Pedro Ruiz. Categoría: INSURANCE',
+    },
+  ];
+
+  for (const def of supplierDefs) {
+    const existing = await prisma.supplier.findFirst({
+      where: { communityId: comm1.id, name: def.name },
+    });
+    if (!existing) {
+      await prisma.supplier.create({
+        data: {
+          communityId: comm1.id,
+          name: def.name,
+          cif: def.cif,
+          phone: def.phone,
+          email: def.email,
+          notes: def.notes,
+          createdById: demoAdmin.id,
+        },
+      });
+      console.log(`✅ Proveedor creado: ${def.name}`);
+    } else {
+      console.log(`ℹ️  Proveedor ya existe: ${def.name}`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 20. INCIDENT #3 — Fuga de agua
+  // ─────────────────────────────────────────────────────────────
+  const existingIncident3 = await prisma.incidentLog.findUnique({
+    where: { communityId_number: { communityId: comm1.id, number: 3 } },
+  });
+  if (!existingIncident3) {
+    await prisma.incidentLog.create({
+      data: {
+        communityId: comm1.id,
+        number: 3,
+        title: 'Fuga de agua en tubería principal',
+        description: 'Vecino del 1B notifica fuga de agua en el armario de contadores de la planta baja.',
+        category: 'PLUMBING',
+        status: 'OPEN',
+        reportedById: demoAdmin.id,
+        photos: [],
+      },
+    });
+    console.log('✅ Incidencia creada: #3 Fuga de agua en tubería principal');
+  } else {
+    console.log('ℹ️  Incidencia ya existe: #3');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 21. MESSAGES — conversation between admin and Ana García
+  // ─────────────────────────────────────────────────────────────
+  let conv1 = await prisma.conversation.findUnique({
+    where: { communityId_residentId: { communityId: comm1.id, residentId: anaUser.id } },
+  });
+  if (!conv1) {
+    conv1 = await prisma.conversation.create({
+      data: {
+        communityId: comm1.id,
+        residentId: anaUser.id,
+        lastMessageAt: new Date('2026-01-21T10:30:00.000Z'),
+      },
+    });
+    console.log('✅ Conversación creada: admin ↔ Ana García');
+  } else {
+    console.log('ℹ️  Conversación ya existe: admin ↔ Ana García');
+  }
+
+  // Message 1: admin → Ana
+  const msg1Existing = await prisma.message.findFirst({
+    where: {
+      conversationId: conv1.id,
+      senderId: demoAdmin.id,
+      fromAdmin: true,
+    },
+  });
+  if (!msg1Existing) {
+    await prisma.message.create({
+      data: {
+        conversationId: conv1.id,
+        senderId: demoAdmin.id,
+        fromAdmin: true,
+        body: 'Estimada Ana, le confirmamos que su cuota de enero ha sido registrada correctamente. Gracias.',
+        createdAt: new Date('2026-01-21T10:00:00.000Z'),
+      },
+    });
+    console.log('✅ Mensaje creado: admin → Ana García');
+  } else {
+    console.log('ℹ️  Mensaje admin→Ana ya existe');
+  }
+
+  // Message 2: Ana → admin
+  const msg2Existing = await prisma.message.findFirst({
+    where: {
+      conversationId: conv1.id,
+      senderId: anaUser.id,
+      fromAdmin: false,
+    },
+  });
+  if (!msg2Existing) {
+    await prisma.message.create({
+      data: {
+        conversationId: conv1.id,
+        senderId: anaUser.id,
+        fromAdmin: false,
+        body: 'Muchas gracias por la confirmación. Un saludo.',
+        createdAt: new Date('2026-01-21T10:30:00.000Z'),
+      },
+    });
+    console.log('✅ Mensaje creado: Ana García → admin');
+  } else {
+    console.log('ℹ️  Mensaje Ana→admin ya existe');
+  }
+
+  // ─────────────────────────────────────────────────────────────
   console.log('\n🎉 Seed completado con éxito.');
   console.log('\n📋 Credenciales de acceso:');
   console.log('   SUPPORT:    support@comugest.app     / Support1234');
