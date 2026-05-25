@@ -3,13 +3,23 @@ import { prisma } from '../../config/prisma';
 import { audit } from '../audit/audit.service';
 import { env } from '../../config/env';
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: '2026-04-22.dahlia',
-});
+// Lazy Stripe instance — only created when STRIPE_SECRET_KEY is set so the
+// server can start without Stripe configured (billing endpoints will return 503).
+type StripeInstance = InstanceType<typeof Stripe>;
+let _stripe: StripeInstance | null = null;
+function getStripe(): StripeInstance {
+  if (!env.STRIPE_SECRET_KEY) {
+    throw new Error('Stripe is not configured (STRIPE_SECRET_KEY missing)');
+  }
+  if (!_stripe) {
+    _stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2026-04-22.dahlia' });
+  }
+  return _stripe;
+}
 
-// Derive types from the stripe instance (compatible with Stripe v17+ / 2026-04-22.dahlia)
-type StripeEvent = ReturnType<typeof stripe.webhooks.constructEvent>;
-type StripeSubscription = Awaited<ReturnType<typeof stripe.subscriptions.retrieve>>;
+// Derive types from Stripe (compatible with Stripe v17+ / 2026-04-22.dahlia)
+type StripeEvent = ReturnType<StripeInstance['webhooks']['constructEvent']>;
+type StripeSubscription = Awaited<ReturnType<StripeInstance['subscriptions']['retrieve']>>;
 
 export async function getOrCreateStripeCustomer(userId: string): Promise<string> {
   const user = await prisma.user.findUniqueOrThrow({
@@ -18,7 +28,7 @@ export async function getOrCreateStripeCustomer(userId: string): Promise<string>
   });
   if (user.stripeCustomerId) return user.stripeCustomerId;
 
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email: user.email,
     name: `${user.firstName} ${user.lastName}`,
     metadata: { userId: user.id },
@@ -31,7 +41,7 @@ export async function getOrCreateStripeCustomer(userId: string): Promise<string>
 export async function createCheckoutSession(userId: string, frontendUrl: string) {
   const customerId = await getOrCreateStripeCustomer(userId);
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -49,7 +59,7 @@ export async function createCheckoutSession(userId: string, frontendUrl: string)
 export async function createPortalSession(userId: string, frontendUrl: string) {
   const customerId = await getOrCreateStripeCustomer(userId);
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: customerId,
     return_url: `${frontendUrl}/billing`,
   });
@@ -119,7 +129,7 @@ export async function createInvoiceCheckoutSession(userId: string, communityId: 
   if (lineItems.length === 0) throw new Error('No hay importes pendientes');
 
   const customer = await getOrCreateStripeCustomer(userId);
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer,
     payment_method_types: ['card'],
     line_items: lineItems,
@@ -134,7 +144,7 @@ export async function createInvoiceCheckoutSession(userId: string, communityId: 
 export async function handleWebhook(rawBody: Buffer, signature: string): Promise<void> {
   let event: StripeEvent;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET);
   } catch {
     throw new Error('Webhook signature verification failed');
   }
