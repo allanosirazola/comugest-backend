@@ -18,6 +18,7 @@ vi.mock('../config/prisma', () => ({
     },
     community: {
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
@@ -83,11 +84,11 @@ vi.mock('../config/prisma', () => ({
       findMany: vi.fn(),
     },
     notification: {
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-      createMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     incidentLog: {
       findUnique: vi.fn(),
@@ -141,4 +142,7 @@ vi.mock('../modules/email/email.service', () => ({
 // Mock push service
 vi.mock('../modules/push/push.service', () => ({
   sendToUser: vi.fn().mockResolvedValue(undefined),
+  sendToCommunity: vi.fn().mockResolvedValue(undefined),
+  saveSubscription: vi.fn().mockResolvedValue(undefined),
+  deleteSubscription: vi.fn().mockResolvedValue(undefined),
 }));
