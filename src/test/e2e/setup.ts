@@ -1,0 +1,116 @@
+/**
+ * E2E test setup — configures environment variables for the real test database.
+ * Runs before all E2E tests. No Prisma mocks; uses comugest_test PostgreSQL DB.
+ */
+
+// Set environment variables BEFORE any modules are imported.
+// These override whatever is in the .env (or .env.test) on disk.
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://comugest:comugest@localhost:5432/comugest_test?schema=public';
+process.env.JWT_ACCESS_SECRET = 'e2e-test-access-secret-at-least-32-chars-long!!';
+process.env.JWT_REFRESH_SECRET = 'e2e-test-refresh-secret-at-least-32-chars-long!!';
+process.env.JWT_ACCESS_EXPIRES_IN = '15m';
+process.env.JWT_REFRESH_EXPIRES_IN = '30d';
+process.env.BCRYPT_ROUNDS = '10'; // Minimum valid value for tests (schema requires min 10)
+process.env.EMAIL_PROVIDER = 'console'; // Don't send real emails
+process.env.STRIPE_SECRET_KEY = '';
+process.env.VAPID_PUBLIC_KEY = '';
+process.env.VAPID_PRIVATE_KEY = '';
+process.env.PORT = '4001'; // Different from dev server
+process.env.RATE_LIMIT_MAX = '10000'; // Disable effective rate limiting during tests
+process.env.RATE_LIMIT_WINDOW_MS = '900000'; // 15 minutes (default)
+
+import { beforeAll, afterAll } from 'vitest';
+import { prisma } from '../../config/prisma';
+
+/**
+ * Wipe all data from the test database in dependency order.
+ * Re-runs before every test suite to guarantee isolation.
+ */
+export async function resetDatabase() {
+  // Delete in reverse dependency order to avoid FK violations
+  const tableNames = [
+    // Payment-related (leaf nodes first)
+    'Payment',
+    'InvoiceItem',
+    'Invoice',
+    // Budget
+    'BudgetLine',
+    'Budget',
+    // Expenses
+    'Expense',
+    // Common areas & reservations
+    'ReservationWaitlist',
+    'Reservation',
+    'CommonArea',
+    // Incidents
+    'IncidentLog',
+    // Messages
+    'Message',
+    'Conversation',
+    // Announcements
+    'Announcement',
+    // Procedures
+    'ProcedureUpdate',
+    'Procedure',
+    // Documents
+    'Document',
+    // Meetings (MeetingMinute doesn't exist in schema; Meeting/MeetingAttendee do)
+    'MeetingAttendee',
+    'Vote',
+    'Poll',
+    'Meeting',
+    // Unit-related
+    'UnitNote',
+    'MeterReading',
+    // Tickets (TicketComment uses onDelete: Restrict for author)
+    'TicketComment',
+    'Ticket',
+    // Recurring invoices
+    'RecurringInvoice',
+    // Suppliers
+    'Supplier',
+    // Bank
+    'BankTransaction',
+    'BankAccount',
+    // Ownership/occupancy (must be before Unit and User)
+    'Occupancy',
+    'Ownership',
+    // Units
+    'Unit',
+    // Community admins
+    'CommunityAdmin',
+    // AuditLog (actor -> User, SetNull — safe to delete after community data)
+    'AuditLog',
+    // Communities
+    'Community',
+    // User tokens and notifications
+    'Notification',
+    'PushSubscription',
+    'RefreshToken',
+    'VerificationToken',
+    'MessageTemplate',
+    'CustomFieldDefinition',
+    // Users last
+    'User',
+  ];
+
+  for (const table of tableNames) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any)[table.charAt(0).toLowerCase() + table.slice(1)]?.deleteMany();
+    } catch {
+      // Some tables might not exist yet — ignore
+    }
+  }
+}
+
+beforeAll(async () => {
+  await prisma.$connect();
+  await resetDatabase();
+});
+
+afterAll(async () => {
+  await resetDatabase();
+  await prisma.$disconnect();
+});
