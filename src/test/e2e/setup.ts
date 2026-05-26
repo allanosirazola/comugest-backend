@@ -30,42 +30,68 @@ import { prisma } from '../../config/prisma';
 export async function resetDatabase() {
   // Delete in reverse dependency order to avoid FK violations
   const tableNames = [
+    // Payment-related (leaf nodes first)
     'Payment',
     'InvoiceItem',
     'Invoice',
-    'Expense',
-    'BudgetItem',
+    // Budget
+    'BudgetLine',
     'Budget',
+    // Expenses
+    'Expense',
+    // Common areas & reservations
+    'ReservationWaitlist',
     'Reservation',
     'CommonArea',
-    'Incident',
+    // Incidents
     'IncidentLog',
+    // Messages
     'Message',
     'Conversation',
+    // Announcements
     'Announcement',
+    // Procedures
+    'ProcedureUpdate',
     'Procedure',
+    // Documents
     'Document',
-    'MeetingMinute',
+    // Meetings (MeetingMinute doesn't exist in schema; Meeting/MeetingAttendee do)
+    'MeetingAttendee',
+    'Vote',
+    'Poll',
     'Meeting',
+    // Unit-related
     'UnitNote',
     'MeterReading',
-    'Meter',
+    // Tickets (TicketComment uses onDelete: Restrict for author)
+    'TicketComment',
+    'Ticket',
+    // Recurring invoices
     'RecurringInvoice',
+    // Suppliers
     'Supplier',
-    'DelinquencyRecord',
+    // Bank
+    'BankTransaction',
+    'BankAccount',
+    // Ownership/occupancy (must be before Unit and User)
     'Occupancy',
     'Ownership',
+    // Units
     'Unit',
+    // Community admins
     'CommunityAdmin',
+    // AuditLog (actor -> User, SetNull — safe to delete after community data)
+    'AuditLog',
+    // Communities
     'Community',
+    // User tokens and notifications
     'Notification',
     'PushSubscription',
     'RefreshToken',
-    'PasswordReset',
-    'EmailVerification',
+    'VerificationToken',
     'MessageTemplate',
     'CustomFieldDefinition',
-    'NotificationPreference',
+    // Users last
     'User',
   ];
 
